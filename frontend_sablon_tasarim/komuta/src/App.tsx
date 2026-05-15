@@ -81,26 +81,26 @@ export default function App() {
       randomScenario();
     }, 5000);
 
-    addLog("Uplink", "SECURE_TUNNEL_ESTABLISHED", LogType.SYSTEM);
-    addLog("Central", "AI_ENGINE_v4_ONLINE", LogType.AI);
+    addLog("Veri Hattı", "GÜVENLİ_TÜNEL_KURULDU", LogType.SYSTEM);
+    addLog("Merkez", "AI_MOTORU_v4_ÇEVRİMİÇİ", LogType.AI);
 
     return () => clearInterval(interval);
   }, [addLog]);
 
   return (
-    <div className="relative h-screen w-screen bg-bg-base text-gray-50 overflow-hidden font-sans">
+    <div className="relative h-screen w-screen bg-bg-base text-gray-100 overflow-hidden font-sans">
       <MapPanel units={units} riskZones={riskZones} toolMode={toolMode} setToolMode={setToolMode} />
       
       <IntelligenceLogPanel logs={logs} />
 
       {/* Desktop-Only Warning Overlay */}
-      <div className="lg:hidden fixed inset-0 z-[10000] bg-gray-900/95 backdrop-blur-xl flex items-center justify-center p-12 text-center">
-        <div className="max-w-md glass-panel p-8">
-          <div className="h-2 w-12 bg-red-500 mx-auto mb-6 rounded-full animate-pulse" />
-          <h2 className="text-2xl font-bold text-white mb-4 tracking-tighter uppercase">ACCESS_DENIED</h2>
-          <p className="text-gray-400 font-mono text-sm leading-relaxed">
-            SYSTEM_ERROR: VIEWPORT_SIZE_INSUFFICIENT<br/>
-            Bu arayüz sadece komuta merkezi monitörleri (≥1024px) için optimize edilmiştir.
+      <div className="lg:hidden fixed inset-0 z-[10000] bg-black backdrop-blur-3xl flex items-center justify-center p-12 text-center">
+        <div className="max-w-md glass-panel p-10 border-accent/30">
+          <div className="h-[1px] w-16 bg-accent mx-auto mb-8 opacity-60" />
+          <h2 className="text-xl font-serif text-accent mb-6 tracking-[0.4em] uppercase">Çözünürlük Gereksinimi</h2>
+          <p className="text-gray-300 font-sans text-xs leading-relaxed tracking-widest uppercase opacity-90">
+            Egemen Komuta daha geniş bir görüş alanı gerektirir.<br/>
+            Lütfen komuta düzeyi bir ekran (≥1024px) ile erişin.
           </p>
         </div>
       </div>

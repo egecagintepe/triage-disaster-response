@@ -1,28 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cinzel", serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg-base: #111827;
-  --color-bg-elevated: #1F2937;
-  --color-border-default: #374151;
+  --color-bg-base: #000000;
+  --color-bg-elevated: #0a0a0a;
+  --color-border-default: #1a1a1a;
+  
+  --color-accent: #C5A059;
+  --color-accent-dim: #4B3F2A;
+  
   --color-success: #10B981;
-  --color-error: #EF4444;
-  --color-warning: #F59E0B;
-  --color-info: #3B82F6;
+  --color-error: #8B0000;
+  --color-warning: #B45309;
+  --color-info: #1E3A8A;
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-gray-950/80 backdrop-blur-xl border border-white/10 shadow-[0_0_25px_rgba(0,0,0,0.5)] rounded-xl;
+    @apply bg-black/60 backdrop-blur-2xl border border-white/5 shadow-[0_0_50px_rgba(0,0,0,1)] rounded-sm;
+    background-image: radial-gradient(circle at top left, rgba(255,255,255,0.02), transparent);
+  }
+  
+  .baroque-border {
+    @apply relative border border-accent/20;
+  }
+  
+  .baroque-border::before {
+    content: '';
+    @apply absolute -inset-[1px] border border-accent/10 pointer-events-none;
   }
 }
 
 @layer base {
   body {
-    @apply bg-[#0a0f1a] text-gray-50 font-sans overflow-hidden;
+    @apply bg-black text-gray-200 font-sans overflow-hidden antialiased;
+  }
+  
+  h1, h2, h3, h4 {
+    @apply font-serif tracking-widest uppercase;
   }
 }
 
