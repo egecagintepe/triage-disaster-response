@@ -1772,13 +1772,13 @@ triage-v2/
 ### PHASE 1: Temel Altyapı (Sprint 1-2, 2 hafta)
 
 #### Sprint 1.1: Backend Skeleton
-- [ ] FastAPI projesi kurulumu
-- [ ] SQLite veritabanı şema oluşturma
-- [ ] Basic CRUD endpoints (tasks, teams, zones)
-- [ ] JWT authentication
-- [ ] WebSocket connection manager
+- [X] FastAPI projesi kurulumu
+- [X] SQLite veritabanı şema oluşturma
+- [X] Basic CRUD endpoints (tasks, teams, zones)
+- [X] JWT authentication
+- [X] WebSocket connection manager
 
-**Çıktı:** Backend API `/docs` üzerinden test edilebilir durumda
+**Çıktı:** Backend API `/docs` üzerinden test edilebilir durumda ✅
 
 #### Sprint 1.2: Frontend Foundation
 - [ ] Vite + React projesi kurulumu
