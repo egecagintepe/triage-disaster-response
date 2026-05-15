@@ -1714,90 +1714,40 @@ triage-v2/
 │   └── .env.example
 │
 ├── frontend/
-│   ├── public/
-│   │   ├── manifest.json         # PWA manifest
-│   │   ├── sw.js                 # Service Worker (offline support)
-│   │   ├── icon-192x192.png
-│   │   └── icon-512x512.png
+│   ├── admin/                     # Komuta Merkezi (Ayrı Vite+React+TS uygulaması)
+│   │   ├── src/
+│   │   │   ├── App.tsx
+│   │   │   ├── main.tsx
+│   │   │   ├── index.css
+│   │   │   ├── types.ts
+│   │   │   ├── components/
+│   │   │   │   ├── MapPanel.tsx
+│   │   │   │   ├── CommandSidePanel.tsx
+│   │   │   │   └── IntelligenceLogPanel.tsx
+│   │   │   ├── services/          # (Phase 4'te eklenecek)
+│   │   │   ├── stores/            # (Phase 4'te eklenecek)
+│   │   │   └── hooks/             # (Phase 4'te eklenecek)
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   └── tsconfig.json
 │   │
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   │   ├── Button.jsx
-│   │   │   │   ├── LoadingSpinner.jsx
-│   │   │   │   ├── ConnectionStatus.jsx
-│   │   │   │   └── ErrorBoundary.jsx
-│   │   │   │
-│   │   │   ├── map/
-│   │   │   │   ├── BaseMap.jsx
-│   │   │   │   ├── TaskMarker.jsx
-│   │   │   │   ├── ZonePolygon.jsx
-│   │   │   │   ├── TeamMarker.jsx
-│   │   │   │   └── HeatmapLayer.jsx
-│   │   │   │
-│   │   │   ├── admin/
-│   │   │   │   ├── Dashboard.jsx
-│   │   │   │   ├── TeamList.jsx
-│   │   │   │   ├── TaskQueue.jsx
-│   │   │   │   ├── ZoneManager.jsx
-│   │   │   │   ├── Analytics.jsx
-│   │   │   │   └── SystemLogs.jsx
-│   │   │   │
-│   │   │   └── field/
-│   │   │       ├── ActiveTaskCard.jsx
-│   │   │       ├── ActionButtons.jsx
-│   │   │       ├── NavigationMap.jsx
-│   │   │       └── OfflineIndicator.jsx
-│   │   │
-│   │   ├── pages/
-│   │   │   ├── AdminDashboard.jsx
-│   │   │   ├── MobileFieldApp.jsx
-│   │   │   └── Login.jsx
-│   │   │
-│   │   ├── services/
-│   │   │   ├── localDb.js         # Dexie.js setup
-│   │   │   ├── syncQueue.js       # Offline sync queue
-│   │   │   ├── websocket.js       # WebSocket client
-│   │   │   ├── api.js             # Axios instance
-│   │   │   └── geolocation.js     # GPS tracking
-│   │   │
-│   │   ├── stores/
-│   │   │   ├── taskStore.js       # Zustand
-│   │   │   ├── teamStore.js
-│   │   │   ├── uiStore.js
-│   │   │   └── syncStore.js
-│   │   │
-│   │   ├── hooks/
-│   │   │   ├── useOnlineStatus.js
-│   │   │   ├── useSyncStatus.js
-│   │   │   ├── useGeolocation.js
-│   │   │   └── useTaskOperations.js
-│   │   │
-│   │   ├── utils/
-│   │   │   ├── conflictResolver.js
-│   │   │   ├── dateFormatter.js
-│   │   │   ├── errorHandler.js
-│   │   │   └── validators.js
-│   │   │
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   │
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── package.json
-│   └── .env.example
-│
-├── frontend_sablon_tasarim/       # HAM TASARIM DOSYALARI
-│   ├── admin-dashboard-v1.html
-│   ├── mobile-field-app-v1.html
-│   ├── components/
-│   │   ├── map-component.html
-│   │   ├── task-card.html
-│   │   └── action-buttons.html
-│   └── assets/
-│       ├── styles/
-│       └── scripts/
+│   └── field/                     # Saha Uygulaması (Ayrı Vite+React+TS PWA)
+│       ├── src/
+│       │   ├── App.tsx
+│       │   ├── main.tsx
+│       │   ├── index.css
+│       │   ├── components/
+│       │   │   ├── StatusBar.tsx
+│       │   │   ├── TaskMap.tsx
+│       │   │   └── SwipeButton.tsx
+│       │   ├── lib/
+│       │   │   └── db.ts          # Dexie.js setup
+│       │   ├── services/          # (Phase 4'te eklenecek)
+│       │   ├── stores/            # (Phase 4'te eklenecek)
+│       │   └── hooks/             # (Phase 4'te eklenecek)
+│       ├── package.json
+│       ├── vite.config.ts
+│       └── tsconfig.json
 │
 ├── docs/
 │   ├── ARCHITECTURE.md            # Bu dosya
@@ -1808,9 +1758,9 @@ triage-v2/
 ├── scripts/
 │   ├── init_db.py                 # Database initialization
 │   ├── seed_data.py               # Test data seeder
-│   └── deploy.sh                  # Deployment script
+│   └── deploy.sh                  # Bare-metal deployment script
 │
-├── docker-compose.yml
+├── ~~docker-compose.yml~~         # [DEPRECATED] Bare-metal deployment kullanılıyor
 ├── .gitignore
 ├── README.md
 └── LICENSE
@@ -1892,63 +1842,28 @@ triage-v2/
 
 ---
 
-### PHASE 4: Frontend Şablon Entegrasyonu (Sprint 8-9, 2 hafta)
+### PHASE 4: State, Offline DB ve WebSocket Entegrasyonu (Sprint 8-9, 2 hafta)
 
-#### Sprint 4.1: Component Migration
-**Bu aşamada `frontend_sablon_tasarim` klasöründeki HTML şablonları React komponentlerine çevrilecek.**
+> **[DEPRECATED] Eski yaklaşım:** HTML şablonlarını React komponentlerine çevirme.
+> **Yeni yaklaşım:** Mevcut React+TS komponentlerine state management, offline DB ve WebSocket katmanlarını bağlama.
 
-##### Entegrasyon Sırası:
-1. **Önce Common Components** (Tekrar kullanılabilir parçalar)
-   - Button styles
-   - Card layouts
-   - Loading states
-   
-2. **Map Components** (Harita ilgili tüm UI)
-   - Base map styles
-   - Marker designs
-   - Popups & tooltips
-   
-3. **Admin Dashboard Components**
-   - Layout grid structure
-   - Sidebar panels
-   - Analytics cards
-   - Team/Task lists
-   
-4. **Mobile Field App Components**
-   - Full-screen layouts
-   - Action button styles
-   - Navigation UI
+#### Sprint 4.1: Admin (Komuta) App Wiring
+- [ ] Zustand store entegrasyonu (taskStore, teamStore, syncStore)
+- [ ] REST API client servisi (api.ts)
+- [ ] WebSocket client servisi (websocket.ts)
+- [ ] MapPanel → canlı task/team verisi bağlama
+- [ ] CommandSidePanel → API-driven ekip yönetimi
+- [ ] IntelligenceLogPanel → gerçek sistem event’leri
 
-##### Entegrasyon Metodu:
-```javascript
-// Örnek: HTML şablondan React component'e çevirme
+#### Sprint 4.2: Field (Saha) App Wiring
+- [ ] Dexie.js offline DB şemasını backend şemasıyla hizalama
+- [ ] Sync queue servisi (syncQueue.ts)
+- [ ] WebSocket client servisi (websocket.ts)
+- [ ] SwipeButton aksiyonları → offline-first task status update
+- [ ] TaskMap → canlı görev koordinatları
+- [ ] StatusBar → gerçek bağlantı durumu ve sync status
 
-// ÖNCESİ (frontend_sablon_tasarim/action-buttons.html)
-/*
-<div class="action-buttons-container">
-  <button class="action-btn action-btn-green">
-    🟢 BÖLGEYE ULAŞILDI
-  </button>
-</div>
-*/
-
-// SONRASI (src/components/field/ActionButtons.jsx)
-export function ActionButtons({ onArrived }) {
-  return (
-    <div className="grid grid-cols-1 gap-4 p-6 bg-gray-800">
-      <button
-        onClick={onArrived}
-        className="h-24 bg-green-600 hover:bg-green-700 
-                   text-white text-2xl font-bold rounded-xl"
-      >
-        🟢 BÖLGEYE ULAŞILDI
-      </button>
-    </div>
-  );
-}
-```
-
-**Çıktı:** Tüm UI şablonları React komponentleri olarak entegre edildi
+**Çıktı:** Her iki frontend uygulaması backend API’ye bağlı ve offline-first çalışıyor
 
 ---
 
@@ -1974,9 +1889,11 @@ export function ActionButtons({ onArrived }) {
 
 ### PHASE 6: Deployment & Training (Sprint 11, 1 hafta)
 
-#### Sprint 6.1: Deployment
-- [ ] Docker containerization
-- [ ] Deployment scripts
+#### Sprint 6.1: Deployment (Bare-Metal)
+- [ ] ~~Docker containerization~~ [DEPRECATED]
+- [ ] systemd service dosyaları (triage-backend.service)
+- [ ] Nginx konfigürasyonu (admin + field + API proxy)
+- [ ] Bare-metal deployment script (scripts/deploy.sh)
 - [ ] WiFi hotspot configuration guide
 - [ ] System monitoring setup
 
@@ -1990,283 +1907,153 @@ export function ActionButtons({ onArrived }) {
 
 ---
 
-## 13. Frontend Şablon Entegrasyon Planı
+## 13. Frontend Entegrasyon Planı (Güncellenmiş)
 
-### 13.1 Şablon Analiz ve Kategorileme
+> **[DEPRECATED] Eski yaklaşım:** `frontend_sablon_tasarim` klasöründeki HTML şablonları JSX'e çevirme.
+> **Yeni yaklaşım:** Mevcut Vite+React+TypeScript uygulamaları `frontend/admin` ve `frontend/field` olarak taşınacak ve backend servislerine bağlanacak.
 
-#### Kategorize Edilmiş Şablonlar:
+### 13.1 Mevcut Şablon Gerçekliği
 
-**Kategori A: Layout Şablonları**
-- `admin-dashboard-v1.html` → `src/pages/AdminDashboard.jsx`
-- `mobile-field-app-v1.html` → `src/pages/MobileFieldApp.jsx`
+| Şablon | Kaynak | Hedef | Durum |
+|--------|--------|-------|-------|
+| **komuta** | `frontend_sablon_tasarim/komuta/` | `frontend/admin/` | Tam React+TS uygulaması, UI hazır |
+| **mobil** | `frontend_sablon_tasarim/mobil/` | `frontend/field/` | Tam React+TS PWA, Dexie.js entegre |
 
-**Kategori B: Component Şablonları**
-- `map-component.html` → `src/components/map/BaseMap.jsx`
-- `task-card.html` → `src/components/field/ActiveTaskCard.jsx`
-- `action-buttons.html` → `src/components/field/ActionButtons.jsx`
+### 13.2 Entegrasyon Workflow (Yeni)
 
-**Kategori C: Style Assets**
-- CSS custom properties → `tailwind.config.js` theme extend
-- JavaScript utilities → React hooks
-
-### 13.2 Entegrasyon Workflow
-
-Analiz
+Mevcut Komponent Analizi
 ↓
+Mevcut React komponentlerini incele
+Prop interface'lerini belirle
+Mock veri kaynaklarını tespit et
 
-HTML dosyasını incele
-Kullanılan class'ları listele
-JavaScript logic'i tespit et
-
-
-Çevirme
+Servis Katmanı Ekleme
 ↓
+api.ts (REST client)
+websocket.ts (WS client)
+syncQueue.ts (offline sync)
 
-HTML → JSX
-Class names → Tailwind classes
-Vanilla JS → React hooks
-
-
-Test
+Store Katmanı Ekleme
 ↓
+Zustand stores oluştur
+Mock data → store data geçişi
+Optimistic UI pattern uygula
 
-Component izole olarak test et
-Props interface'ini doğrula
-Event handler'ları kontrol et
-
-
-Entegrasyon
+Komponent Wiring
 ↓
+Komponentleri store'lara bağla
+API call'ları entegre et
+Offline fallback ekle
 
-Ana sayfaya import et
-State management bağla
-API calls ekle
+### 13.3 Entegrasyon Checklist (Her uygulama için)
 
-
-
-
-### 13.3 Detaylı Entegrasyon Örneği
-
-#### Örnek: `action-buttons.html` → `ActionButtons.jsx`
-
-**Adım 1: HTML Analizi**
-```html
-<!-- frontend_sablon_tasarim/components/action-buttons.html -->
-<div class="action-buttons-container">
-  <button class="action-btn action-btn-arrived" onclick="handleArrived()">
-    🟢 BÖLGEYE ULAŞILDI
-  </button>
-  <button class="action-btn action-btn-backup" onclick="handleBackup()">
-    🔴 DESTEK EKİP LAZIM
-  </button>
-  <button class="action-btn action-btn-cancel" onclick="handleCancel()">
-    ⚪ HASAR YOK
-  </button>
-</div>
-
-<style>
-.action-btn {
-  height: 96px;
-  font-size: 1.5rem;
-  font-weight: bold;
-  border-radius: 12px;
-  transition: all 0.15s;
-}
-.action-btn-arrived { background: #16a34a; }
-.action-btn-backup { background: #dc2626; }
-.action-btn-cancel { background: #4b5563; }
-</style>
-```
-
-**Adım 2: React Component**
-```jsx
-// src/components/field/ActionButtons.jsx
-import React from 'react';
-import { useTaskStore } from '../../stores/taskStore';
-
-export function ActionButtons() {
-  const { activeTask, updateTaskStatus } = useTaskStore();
-  
-  const handleArrived = async () => {
-    await updateTaskStatus(activeTask.id, 'in_progress');
-  };
-  
-  const handleBackup = async () => {
-    await updateTaskStatus(activeTask.id, 'needs_backup');
-  };
-  
-  const handleCancel = async () => {
-    await updateTaskStatus(activeTask.id, 'false_alarm');
-  };
-  
-  return (
-    <div className="grid grid-cols-1 gap-4 p-6 bg-gray-800">
-      <button
-        onClick={handleArrived}
-        className="h-24 bg-green-600 hover:bg-green-700 active:bg-green-800
-                   text-white text-2xl font-bold rounded-xl
-                   shadow-lg active:shadow-inner
-                   transition-all duration-150"
-      >
-        🟢 BÖLGEYE ULAŞILDI
-      </button>
-      
-      <button
-        onClick={handleBackup}
-        className="h-24 bg-red-600 hover:bg-red-700 active:bg-red-800
-                   text-white text-2xl font-bold rounded-xl
-                   shadow-lg active:shadow-inner
-                   transition-all duration-150"
-      >
-        🔴 DESTEK EKİP LAZIM
-      </button>
-      
-      <button
-        onClick={handleCancel}
-        className="h-20 bg-gray-600 hover:bg-gray-700 active:bg-gray-800
-                   text-white text-xl font-bold rounded-xl
-                   shadow-lg active:shadow-inner
-                   transition-all duration-150"
-      >
-        ⚪ HASAR YOK / GÖREVİ İPTAL ET
-      </button>
-    </div>
-  );
-}
-```
-
-**Adım 3: Store Integration**
-```javascript
-// src/stores/taskStore.js
-import create from 'zustand';
-import { db } from '../services/localDb';
-import { queueForSync } from '../services/syncQueue';
-
-export const useTaskStore = create((set, get) => ({
-  activeTask: null,
-  tasks: [],
-  
-  updateTaskStatus: async (taskId, newStatus) => {
-    const timestamp = Date.now();
-    
-    // Optimistic UI update
-    set(state => ({
-      tasks: state.tasks.map(t =>
-        t.id === taskId ? { ...t, status: newStatus } : t
-      ),
-      activeTask: state.activeTask?.id === taskId
-        ? { ...state.activeTask, status: newStatus }
-        : state.activeTask
-    }));
-    
-    // Local DB update
-    await db.tasks.update(taskId, {
-      status: newStatus,
-      local_updated_at: timestamp
-    });
-    
-    // Queue for server sync
-    await queueForSync('tasks', 'update', {
-      id: taskId,
-      status: newStatus,
-      local_updated_at: timestamp
-    });
-    
-    // If task completed, fetch next task
-    if (['false_alarm', 'resolved'].includes(newStatus)) {
-      const nextTask = get().tasks.find(t => t.status === 'pending');
-      set({ activeTask: nextTask || null });
-    }
-  }
-}));
-```
-
-### 13.4 Entegrasyon Checklist
-
-Her şablon için aşağıdaki checklist kullanılacak:
-
-- [ ] HTML → JSX çevirimi yapıldı
-- [ ] Inline styles → Tailwind classes çevrildi
-- [ ] Event handlers → React onClick/onChange yapıldı
-- [ ] Global state (Zustand) bağlandı
-- [ ] Local database (Dexie) operations eklendi
-- [ ] API calls (axios) entegre edildi
+- [ ] Uygulama `frontend/` altına taşındı
+- [ ] API client servisi eklendi (api.ts)
+- [ ] WebSocket client servisi eklendi (websocket.ts)
+- [ ] Zustand store'lar oluşturuldu
+- [ ] Mock data → API/store verisi geçişi yapıldı
+- [ ] Offline-first sync queue entegre edildi
 - [ ] Error handling eklendi
-- [ ] Loading states eklendi
-- [ ] Offline mode support test edildi
-- [ ] Component documentation yazıldı
+- [ ] Connection status göstergesi bağlandı
+- [ ] Offline mode test edildi
+
 
 ---
 
+
 ## 14. Deployment ve DevOps
 
-### 14.1 Docker Setup
+### 14.1 Deployment Stratejisi: Bare-Metal (systemd + Nginx)
 
-```dockerfile
-# Dockerfile.backend
-FROM python:3.11-slim
+> **[DEPRECATED] Docker yaklaşımı terk edilmiştir.** Master Node, afet bölgesinde kaynak kısıtlı bir cihaz (Mini-PC / Raspberry Pi) olacağından Docker overhead'i kabul edilemez. Bare-metal deployment tercih edilmiştir.
 
-WORKDIR /app
+#### 14.1.1 Backend: Uvicorn + systemd
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+```ini
+# /etc/systemd/system/triage-backend.service
+[Unit]
+Description=TRIAGE V2 FastAPI Backend
+After=network.target
 
-COPY . .
+[Service]
+Type=simple
+User=triage
+WorkingDirectory=/opt/triage-v2/backend
+Environment="PATH=/opt/triage-v2/backend/venv/bin"
+EnvironmentFile=/opt/triage-v2/backend/.env
+ExecStart=/opt/triage-v2/backend/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+[Install]
+WantedBy=multi-user.target
 ```
 
-```dockerfile
-# Dockerfile.frontend
-FROM node:20-alpine AS builder
+#### 14.1.2 Frontend: Nginx Static Serving
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+```nginx
+# /etc/nginx/sites-available/triage
+server {
+    listen 80;
+    server_name 192.168.1.1;
 
-COPY . .
-RUN npm run build
+    # Admin Dashboard (Komuta Merkezi)
+    location / {
+        root /opt/triage-v2/frontend/admin/dist;
+        try_files $uri $uri/ /index.html;
+    }
 
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+    # Field App (Saha Uygulaması)
+    location /field/ {
+        alias /opt/triage-v2/frontend/field/dist/;
+        try_files $uri $uri/ /field/index.html;
+    }
 
-EXPOSE 80
+    # API Proxy
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # WebSocket Proxy
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
 ```
 
-```yaml
-# docker-compose.yml
-version: '3.8'
+#### 14.1.3 Deployment Script
 
-services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data  # SQLite database
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - SECRET_KEY=${SECRET_KEY}
-    networks:
-      - triage-network
-  
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-    networks:
-      - triage-network
+```bash
+#!/bin/bash
+# scripts/deploy.sh
+set -e
 
-networks:
-  triage-network:
-    driver: bridge
+echo "=== TRIAGE V2 Bare-Metal Deploy ==="
+
+# Backend
+cd /opt/triage-v2/backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart triage-backend
+
+# Frontend Admin
+cd /opt/triage-v2/frontend/admin
+npm ci && npm run build
+
+# Frontend Field
+cd /opt/triage-v2/frontend/field
+npm ci && npm run build
+
+# Nginx
+sudo systemctl restart nginx
+
+echo "=== Deploy tamamlandı ==="
 ```
 
 ### 14.2 Environment Variables
