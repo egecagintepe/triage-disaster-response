@@ -50,6 +50,7 @@ interface Props {
  */
 export default function CommandSidePanel({ units, tasks = [], map, mode, setMode, isOnline = true }: Props) {
   const [activeTab, setActiveTab] = useState<"fleet" | "tasks">("tasks");
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const completeTask = useTaskStore((s) => s.completeTask);
   const storeTeams = useTeamStore((s) => s.teams);
 
@@ -81,6 +82,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
   const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "assigned");
   const backupTasks = tasks.filter((t) => t.status === "needs_backup");
 
+  return (
     <>
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
