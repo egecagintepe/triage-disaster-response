@@ -110,6 +110,17 @@ async def lifespan(app: FastAPI):
     # Startup: create tables
     await init_db()
     print("[OK] Database initialised")
+    
+    # PHASE 1: Total Database Purge (Hard Reset)
+    from sqlalchemy import text
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM tasks"))
+        await session.execute(text("DELETE FROM zones"))
+        await session.execute(text("DELETE FROM system_events"))
+        await session.execute(text("DELETE FROM sync_logs"))
+        await session.execute(text("DELETE FROM teams"))
+        await session.commit()
+    print("[OK] Database purged for fresh demo start")
     # Start autonomous AI loop
     _ai_loop_task = asyncio.create_task(_autonomous_triage_loop())
     print("[OK] Autonomous AI triage loop started")

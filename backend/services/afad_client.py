@@ -176,6 +176,9 @@ async def fetch_latest_earthquake() -> dict:
     events = []
 
     # 1. Fetch Kandilli
+    def in_turkey(lat: float, lng: float) -> bool:
+        return 35.5 <= lat <= 42.5 and 25.5 <= lng <= 45.5
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.get(KANDILLI_API_URL)
@@ -183,13 +186,19 @@ async def fetch_latest_earthquake() -> dict:
             if data:
                 eq = data[0]
                 coords = eq.get("geojson", {}).get("coordinates", [0, 0])
+                lat = float(coords[1])
+                lng = float(coords[0])
+                if not in_turkey(lat, lng):
+                    continue
+                
+                title = eq.get("location_properties", {}).get("epiCenter", {}).get("name") or eq.get("title", "Bilinmeyen")
                 events.append({
                     "id": eq.get("earthquake_id", f"KANDILLI-{eq.get('date_time', '')}"),
                     "mag": float(eq.get("mag", 0.0)),
                     "depth": float(eq.get("depth", 0.0)),
-                    "lat": float(coords[1]),
-                    "lng": float(coords[0]),
-                    "title": eq.get("location_properties", {}).get("epiCenter", {}).get("name") or eq.get("title", "Bilinmeyen"),
+                    "lat": lat,
+                    "lng": lng,
+                    "title": title,
                     "date": eq.get("date_time", ""),
                     "source": "AFAD/Kandilli",
                     "closestCities": eq.get("location_properties", {}).get("closestCities", [])
@@ -205,12 +214,17 @@ async def fetch_latest_earthquake() -> dict:
             for f in data:
                 prop = f["properties"]
                 geom = f["geometry"]["coordinates"]
+                lat = float(geom[1])
+                lng = float(geom[0])
+                if not in_turkey(lat, lng):
+                    continue
+
                 events.append({
                     "id": f["id"],
                     "mag": float(prop.get("mag", 0.0)),
                     "depth": float(geom[2]),
-                    "lat": float(geom[1]),
-                    "lng": float(geom[0]),
+                    "lat": lat,
+                    "lng": lng,
                     "title": prop.get("place", "Unknown"),
                     "date": __import__('datetime').datetime.fromtimestamp(prop.get("time", 0)/1000, tz=timezone.utc).isoformat(),
                     "source": "USGS",
@@ -227,6 +241,10 @@ async def fetch_latest_earthquake() -> dict:
             for f in data:
                 prop = f["properties"]
                 geom = f["geometry"]["coordinates"]
+                lat = float(geom[1])
+                lng = float(geom[0])
+                if not in_turkey(lat, lng):
+                    continue
                 
                 raw_region = prop.get("flynn_region", "Unknown")
                 title = raw_region
@@ -235,8 +253,8 @@ async def fetch_latest_earthquake() -> dict:
                     "id": prop.get("unid"),
                     "mag": float(prop.get("mag", 0.0)),
                     "depth": float(prop.get("depth", 0.0)),
-                    "lat": float(geom[1]),
-                    "lng": float(geom[0]),
+                    "lat": lat,
+                    "lng": lng,
                     "title": title,
                     "date": prop.get("time", ""),
                     "source": "EMSC",
