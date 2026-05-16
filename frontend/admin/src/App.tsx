@@ -11,10 +11,12 @@ import Login from "./pages/Login";
 import { IntelligenceLog, LogType, FieldUnit, RiskZone, UnitStatus, ZoneType, ToolMode } from "./types";
 import { useTaskStore } from "./stores/taskStore";
 import { useTeamStore } from "./stores/teamStore";
+import { useZoneStore } from "./stores/zoneStore";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { syncQueue } from "./services/syncQueue";
 import { wsManager } from "./services/websocket";
 import { db, type Task, type Team, type Zone } from "./services/localDb";
+import { useZoneStore } from "./stores/zoneStore";
 import { api } from "./services/api";
 
 /* ------------------------------------------------------------------ */
@@ -87,8 +89,9 @@ export default function App() {
     [storeTeams],
   );
 
-  // Zone data from Dexie (read once on mount, updated by WS)
-  const [zones, setZones] = useState<RiskZone[]>([]);
+  // Zone data from Zustand (instantly reactive)
+  const zones = useZoneStore((s) => s.zones);
+  const setZones = useZoneStore((s) => s.setZones);
 
   useEffect(() => {
     const fetchInitialData = async () => {

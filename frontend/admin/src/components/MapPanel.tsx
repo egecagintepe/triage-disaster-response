@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline, CircleMarker, FeatureGroup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline, CircleMarker, FeatureGroup, useMapEvents } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -12,8 +12,19 @@ import "leaflet-draw/dist/leaflet.draw.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode } from "../types";
 import type { Task } from "../services/localDb";
 import { db } from "../services/localDb";
+import { useZoneStore } from "../stores/zoneStore";
 import { api } from "../services/api";
 import CommandSidePanel from "./CommandSidePanel";
+
+function MouseTracker() {
+  useMapEvents({
+    mousemove(e) {
+      const el = document.getElementById('live-coord');
+      if (el) el.innerText = `LAT:${e.latlng.lat.toFixed(5)} LON:${e.latlng.lng.toFixed(5)}`;
+    }
+  });
+  return null;
+}
 
 const createUnitIcon = (status: UnitStatus) => {
   let color = "#10B981"; // success
@@ -149,7 +160,10 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         console.error("Zone priority override failed", e);
       }
     } else if (toolMode === "ERASER") {
+      // 1. Instant optimistic UI update
+      useZoneStore.getState().deleteZone(zone.id);
       try {
+        // 2. Network & Local persistence
         await api.delete(`/api/v1/zones/${zone.id}`);
         await db.zones.delete(zone.id);
       } catch (e) {
@@ -182,6 +196,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         doubleClickZoom={true}
         ref={setMap}
       >
+        <MouseTracker />
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
         <svg style={{ position: "absolute", width: 0, height: 0 }}>
@@ -309,7 +324,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel p-2.5 px-6 flex items-center gap-6 pointer-events-none border-white/[0.04]">
             <div className="flex flex-col gap-0.5">
               <span className="text-[9px] text-gray-500 font-bold tracking-tighter">COORDINATE_GRID</span>
-              <span className="text-[11px] font-mono text-blue-400/80">LAT:{position[0].toFixed(5)} LON:{position[1].toFixed(5)}</span>
+              <span id="live-coord" className="text-[11px] font-mono text-blue-400/80">LAT:{position[0].toFixed(5)} LON:{position[1].toFixed(5)}</span>
             </div>
             <div className="h-6 w-px bg-white/10" />
             <div className="flex flex-col gap-0.5">

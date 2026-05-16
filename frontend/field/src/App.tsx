@@ -147,6 +147,10 @@ export default function App() {
       const detail = (e as CustomEvent).detail;
       setEmergencyAlert({ message: detail.message, severity: detail.severity });
       playSiren();
+      setTimeout(() => {
+        stopSiren();
+        setEmergencyAlert(null);
+      }, 10000);
     };
     
     const handleClear = () => {
@@ -198,12 +202,7 @@ export default function App() {
             <div className="text-8xl mb-6">🚨</div>
             <h1 className="text-4xl font-black uppercase tracking-wider mb-4">KIRMIZI ALARM</h1>
             <p className="text-xl font-bold mb-8">{emergencyAlert.message}</p>
-            <button
-              onClick={() => setEmergencyAlert(null)}
-              className="px-8 py-4 bg-white text-red-700 font-black text-lg rounded-2xl uppercase tracking-wider"
-            >
-              Anlaşıldı — Kapat
-            </button>
+            <p className="text-gray-200 mt-4 text-sm animate-pulse">Siren 10 saniye boyunca çalacak...</p>
           </div>
         </div>
       )}

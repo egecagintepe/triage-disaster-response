@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { AlertTriangle, QrCode, Clock, Users, Radio, X } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { api } from "../services/api";
 
 interface Props {
@@ -18,7 +19,10 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
   const [showQR, setShowQR] = useState(false);
   const [qrData, setQrData] = useState<{ qr_base64?: string | null; url?: string; ip?: string } | null>(null);
   const [alertSending, setAlertSending] = useState(false);
+  const [showRedAlertModal, setShowRedAlertModal] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("KIRMIZI ALARM — TÜM EKİPLER DİKKAT!");
   const [startTime] = useState(() => Date.now());
+  const dynamicUrl = `${window.location.protocol}//${window.location.hostname}:3001`;
 
   // Ops Clock tick
   useEffect(() => {
@@ -33,12 +37,14 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
   }, [startTime]);
 
   const handlePanic = async () => {
+    if (!alertMessage.trim()) return;
     setAlertSending(true);
     try {
       await api.post("/api/v1/emergency/alert", {
-        message: "KIRMIZI ALARM — TÜM EKİPLER DİKKAT! ACİL TOPLANMA!",
+        message: alertMessage,
         severity: "critical",
       });
+      setShowRedAlertModal(false);
     } catch (e) {
       console.error("Emergency alert failed:", e);
     }
@@ -46,15 +52,6 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
   };
 
   const handleQR = async () => {
-    if (!showQR && !qrData) {
-      try {
-        const data = await api.get<any>("/api/v1/emergency/qr");
-        setQrData(data);
-      } catch (e) {
-        console.error("QR fetch failed:", e);
-        setQrData({ url: "http://localhost:5174", ip: "localhost" });
-      }
-    }
     setShowQR(!showQR);
   };
 
@@ -143,21 +140,53 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
               Bu QR kodu telefonla okutarak saha uygulamasına anında bağlanın.
             </p>
 
-            {qrData?.qr_base64 ? (
-              <img
-                src={qrData.qr_base64}
-                alt="QR Code"
-                className="w-48 h-48 mx-auto rounded-xl border border-white/10 mb-4"
-              />
-            ) : (
-              <div className="w-48 h-48 mx-auto rounded-xl border border-white/10 mb-4 flex items-center justify-center bg-zinc-900">
-                <span className="text-gray-500 text-xs font-mono">QR yükleniyor...</span>
-              </div>
-            )}
+            <div className="bg-white p-2 rounded-xl mb-4 inline-block">
+              <QRCodeCanvas value={dynamicUrl} size={180} />
+            </div>
 
             <div className="bg-zinc-900 rounded-lg p-3 border border-white/5">
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Saha Uygulaması URL</p>
-              <p className="text-sm font-mono text-blue-400 font-bold">{qrData?.url || "..."}</p>
+              <p className="text-sm font-mono text-blue-400 font-bold">{dynamicUrl}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Red Alert Modal */}
+      {showRedAlertModal && (
+        <div className="fixed inset-0 z-[9999] bg-red-950/80 backdrop-blur-md flex items-center justify-center pointer-events-auto">
+          <div className="bg-zinc-950 border border-red-500/50 rounded-2xl p-8 max-w-md w-full relative shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+            <button
+              onClick={() => setShowRedAlertModal(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <AlertTriangle className="h-10 w-10 text-red-500 mb-4 animate-pulse" />
+            <h3 className="text-xl font-bold text-white mb-2 tracking-tight">KIRMIZI ALARM YAYINI</h3>
+            <p className="text-gray-400 text-xs mb-6">Tüm saha personeline iletilecek acil durum mesajını girin. Bu işlem geri alınamaz ve anında tüm cihazlarda siren çaldırır.</p>
+            
+            <input 
+              type="text" 
+              value={alertMessage} 
+              onChange={(e) => setAlertMessage(e.target.value)} 
+              className="w-full bg-black border border-red-500/30 rounded p-3 text-white mb-4 focus:outline-none focus:border-red-500"
+              placeholder="Acil Durum Mesajı..."
+            />
+            
+            <div className="flex justify-end gap-2">
+              <button 
+                onClick={() => setShowRedAlertModal(false)}
+                className="px-4 py-2 rounded bg-zinc-900 text-gray-400 hover:text-white transition-colors text-sm font-bold"
+              >
+                İPTAL
+              </button>
+              <button 
+                onClick={handlePanic}
+                className="px-6 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-bold transition-colors text-sm"
+              >
+                GÖNDER
+              </button>
             </div>
           </div>
         </div>

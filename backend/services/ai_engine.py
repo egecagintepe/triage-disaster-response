@@ -151,7 +151,10 @@ ZONE_ANALYSIS_SCHEMA = {
                     "lat": {"type": "number"},
                     "lng": {"type": "number"},
                     "radius_m": {"type": "number"},
-                    "risk_level": {"type": "string"},
+                    "risk_level": {
+                        "type": "string",
+                        "enum": ["DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK"]
+                    },
                     "priority_score": {"type": "number"},
                     "estimated_casualties": {"type": "integer"},
                     "recommended_team_count": {"type": "integer"},
@@ -178,7 +181,10 @@ ZONE_ANALYSIS_SCHEMA = {
                 "properties": {
                     "zone_name": {"type": "string"},
                     "action_type": {"type": "string"},
-                    "priority": {"type": "string"},
+                    "priority": {
+                        "type": "string",
+                        "enum": ["DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK"]
+                    },
                     "description": {"type": "string"},
                     "required_teams": {"type": "integer"},
                 },
@@ -260,6 +266,7 @@ BÖLGE VERİLERİ:
 GÖREV:
 Yukarıdaki sismik verilere ve {impact_radius_km} km etki yarıçapına (R = e^(0.8 * M) / depth) dayanarak bir risk analizi yap.
 ÖNEMLİ COĞRAFİ KURAL: 'polygon_coordinates' için asla kare veya düzgün altıgen çizmeyin! Sismik dalga yayılımını ve gerçek coğrafyayı taklit eden, merkez üssü etrafında en az 6-8 noktadan oluşan, asimetrik, eliptik veya organik çokgen koordinatları ([lat, lng] formatında) üretin.
+ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK". İngilizce kelime kullanmayın.
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
 1. 'zones' dizisini oluştur: Her bölge için episantr mesafesi ve etki yarıçapını kıyaslayarak risk seviyesi (risk_level), öncelik (priority_score: 1.0-5.0), tahmini kayıp (estimated_casualties) ve merkez koordinatlarını (lat, lng) belirle.

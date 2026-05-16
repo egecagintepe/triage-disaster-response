@@ -63,7 +63,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
   const tools = [
     { id: "CURSOR" as ToolMode, icon: MousePointer2, label: "Manuel Atama" },
     { id: "PEN" as ToolMode, icon: PenTool, label: "Bölge Çiz" },
-    { id: "OVERRIDE" as ToolMode, icon: Star, label: "Öncelik Ezme" },
+    { id: "OVERRIDE" as ToolMode, icon: Star, label: "Toplu Yönetim" },
     { id: "ERASER" as ToolMode, icon: Eraser, label: "Bölge Sil" },
   ];
 
@@ -398,6 +398,52 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
           {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronLeft className="h-4 w-4 text-gray-400" />}
         </button>
       </motion.div>
+
+      {/* Bulk Task Management Drawer (OVERRIDE mode) */}
+      <AnimatePresence>
+        {mode === "OVERRIDE" && (
+          <motion.div
+            initial={{ y: 400, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 400, opacity: 0 }}
+            className="absolute bottom-20 right-6 z-[1002] w-96 max-h-[60vh] glass-panel pointer-events-auto border-white/[0.04] flex flex-col"
+          >
+            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+              <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-400" /> TOPLU GÖREV YÖNETİMİ
+              </h3>
+              <button onClick={() => setMode("CURSOR")} className="text-gray-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {tasks.filter(t => t.status !== "resolved").map(t => (
+                <div key={t.id} className="bg-zinc-950 border border-white/[0.06] rounded p-3 flex justify-between items-center">
+                  <div>
+                    <div className="text-[10px] text-gray-400 font-mono">TASK://{t.id}</div>
+                    <div className="text-xs font-bold text-white mt-1">{t.address?.substring(0, 25) || "Bilinmeyen Konum"}</div>
+                  </div>
+                  <select
+                    className="bg-black border border-white/10 rounded text-xs p-1 px-2 font-mono outline-none focus:border-blue-500"
+                    value={t.priority}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      useTaskStore.getState().updateTask({ id: t.id, priority: val });
+                      api.patch(`/api/v1/tasks/${t.id}`, { priority: val }).catch(console.error);
+                    }}
+                  >
+                    <option value="DÜŞÜK">DÜŞÜK</option>
+                    <option value="ORTA">ORTA</option>
+                    <option value="YÜKSEK">YÜKSEK</option>
+                    <option value="KRİTİK">KRİTİK</option>
+                  </select>
+                </div>
+              ))}
+              {tasks.length === 0 && <div className="text-xs text-gray-500 text-center py-4">Aktif görev yok</div>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

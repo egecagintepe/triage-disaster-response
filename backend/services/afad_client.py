@@ -188,10 +188,14 @@ async def fetch_latest_earthquake() -> dict:
         # Take the first (most recent) earthquake
         eq = results[0]
 
+        # Kandilli GeoJSON is strictly [lng, lat]. We must explicitly map them to avoid reversal bugs.
         coords = eq.get("geojson", {}).get("coordinates", [0, 0])
-        lng, lat = coords[0], coords[1]
-        magnitude = eq.get("mag", 0)
-        depth = eq.get("depth", 0)
+        lng = float(coords[0])
+        lat = float(coords[1])
+        
+        # Strict mapping to prevent depth being read as magnitude
+        magnitude = float(eq.get("mag", 0.0))
+        depth = float(eq.get("depth", 0.0))
         title = eq.get("title", "Bilinmeyen")
         date_str = eq.get("date_time", "")
 
