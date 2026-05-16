@@ -79,6 +79,16 @@ export const useTaskStore = create<TaskState>()(
               : state.activeTask,
         }));
 
+        const state = get();
+        const taskToComplete = state.tasks.find(t => t.id === taskId);
+        if (taskToComplete?.assigned_team_id && ['completed', 'resolved', 'cancelled', 'false_alarm'].includes(status)) {
+          useTeamStore.getState().updateTeamStatus(taskToComplete.assigned_team_id, 'idle');
+          try {
+            await db.teams.update(taskToComplete.assigned_team_id, { status: 'idle' });
+            await queueForSync('teams', 'update', { id: taskToComplete.assigned_team_id, status: 'idle' });
+          } catch(e) {}
+        }
+
         // 2. Persist to Dexie
         try {
           await db.tasks.update(taskId, {

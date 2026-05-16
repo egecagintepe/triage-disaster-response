@@ -13,7 +13,7 @@ export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0
   const [localOnline, setLocalOnline] = useState(navigator.onLine);
   
   const [showSettings, setShowSettings] = useState(false);
-  const [ipValue, setIpValue] = useState(() => localStorage.getItem('triage_server_ip') || 'localhost:8000');
+  const [ipValue, setIpValue] = useState(() => localStorage.getItem('triage_server_ip') || 'https://api.gokberkceviker.com.tr');
 
   const handleSaveIp = () => {
     localStorage.setItem('triage_server_ip', ipValue);

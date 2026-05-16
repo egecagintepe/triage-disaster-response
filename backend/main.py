@@ -231,7 +231,7 @@ async def inject_earthquake(eq: MockEarthquake = Body(None)):
         {"city": "Kahramanmaraş", "lat": 37.57, "lng": 36.92},
     ]
     chosen = random.choice(cities)
-    mag = round(random.uniform(5.8, 7.4), 1)
+    mag = float(f"{random.uniform(6.2, 7.4):.1f}")
     
     eq_lat = chosen["lat"]
     eq_lng = chosen["lng"]
@@ -517,7 +517,7 @@ async def handle_task_status_update(device_id: str, data: dict):
             )
 
         # --- Dispatcher hooks ---
-        if new_status in ("resolved", "false_alarm"):
+        if new_status in ("resolved", "false_alarm", "completed", "cancelled"):
             async with async_session() as session:
                 release_info = await release_team(session, task_data["id"])
                 if release_info:

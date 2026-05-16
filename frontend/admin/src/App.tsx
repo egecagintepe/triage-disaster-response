@@ -284,9 +284,9 @@ export default function App() {
         <div className="lg:hidden fixed inset-0 z-[10000] bg-gray-900/95 backdrop-blur-xl flex items-center justify-center p-12 text-center">
           <div className="max-w-md glass-panel p-8">
             <div className="h-2 w-12 bg-red-500 mx-auto mb-6 rounded-full animate-pulse" />
-            <h2 className="text-2xl font-bold text-white mb-4 tracking-tighter uppercase">ACCESS_DENIED</h2>
+            <h2 className="text-2xl font-bold text-white mb-4 tracking-tighter uppercase">DAHA GENİŞ EKRAN GEREKLİ</h2>
             <p className="text-gray-400 font-mono text-sm leading-relaxed">
-              SYSTEM_ERROR: VIEWPORT_SIZE_INSUFFICIENT<br/>
+              Lütfen bu arayüzü kullanmak için cihazınızı yan çevirin veya daha geniş bir ekrana geçin.<br/>
               Bu arayüz sadece komuta merkezi monitörleri (≥1024px) için optimize edilmiştir.
             </p>
           </div>

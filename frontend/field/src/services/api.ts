@@ -21,7 +21,7 @@ export const getApiBase = () => {
   const savedIp = localStorage.getItem('triage_server_ip');
   if (savedIp) return `http://${savedIp}`;
 
-  return 'http://localhost:8000';
+  return 'https://api.gokberkceviker.com.tr';
 };
 
 export const getWsBase = () => {

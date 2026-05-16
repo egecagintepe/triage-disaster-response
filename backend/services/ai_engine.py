@@ -315,7 +315,7 @@ Yukarıdaki sismik verilere dayanarak risk analizi yap.
 ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK".
 
 CRITICAL SYSTEM RULE: You MUST return EXACTLY ONE (1) zone polygon. You MUST return A MAXIMUM OF 3 TASKS. If you return 4 or more tasks, the system will crash. Focus ONLY on the absolute epicenter.
-CRITICAL: You MUST output exactly ONE object in the "zones" array. Zero exceptions.
+CRITICAL: The JSON 'zones' array MUST contain EXACTLY ONE (1) object. The 'tasks' array can contain up to 3 objects. Do not generate multiple zones.
 RULE 3: Priority MUST scale with magnitude. Do NOT output KRİTİK for anything under Mag 6.0.
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
