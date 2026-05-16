@@ -14,7 +14,6 @@ interface LoginProps {
 
 export default function Login({ onLogin }: LoginProps) {
   const [teamName, setTeamName] = useState('');
-  const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,8 +21,8 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setError('');
 
-    if (!teamName.trim() || !accessCode.trim()) {
-      setError('Ekip adı ve erişim kodu gereklidir.');
+    if (!teamName.trim()) {
+      setError('Ekip adı gereklidir.');
       return;
     }
 
@@ -80,20 +79,6 @@ export default function Login({ onLogin }: LoginProps) {
             />
           </div>
 
-          <div>
-            <label htmlFor="field-access-code" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Erişim Kodu
-            </label>
-            <input
-              id="field-access-code"
-              type="password"
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              className="w-full px-4 py-4 bg-gray-800 border border-gray-700 rounded-2xl text-white text-lg placeholder-gray-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-colors"
-            />
-          </div>
 
           {error && (
             <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">

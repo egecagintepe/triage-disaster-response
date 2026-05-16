@@ -13,7 +13,6 @@ interface LoginProps {
 
 export default function Login({ onLogin }: LoginProps) {
   const [deviceName, setDeviceName] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,8 +20,8 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setError('');
 
-    if (!deviceName.trim() || !password.trim()) {
-      setError('Cihaz adı ve parola gereklidir.');
+    if (!deviceName.trim()) {
+      setError('Cihaz adı gereklidir.');
       return;
     }
 
@@ -78,20 +77,6 @@ export default function Login({ onLogin }: LoginProps) {
             />
           </div>
 
-          <div>
-            <label htmlFor="admin-password" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Erişim Parolası
-            </label>
-            <input
-              id="admin-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-colors"
-            />
-          </div>
 
           {error && (
             <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
