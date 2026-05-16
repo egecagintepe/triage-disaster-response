@@ -3,15 +3,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Battery, Signal, Zap, MousePointer2, PenTool, Star } from "lucide-react";
+import { useState } from "react";
+import { Battery, Signal, Zap, MousePointer2, PenTool, Star, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 import { FieldUnit, UnitStatus, ToolMode } from "../types";
+import type { Task } from "../services/localDb";
+import { useTaskStore } from "../stores/taskStore";
+import { useTeamStore } from "../stores/teamStore";
 import L from "leaflet";
+
+const PRIORITY_COLORS: Record<string, string> = {
+  RED: "text-red-400 bg-red-500/10 border-red-500/20",
+  YELLOW: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  GREEN: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Bekliyor",
+  assigned: "Atandı",
+  in_progress: "Devam Ediyor",
+  needs_backup: "Destek Gerekli",
+  false_alarm: "Yanlış Alarm",
+  resolved: "Tamamlandı",
+};
 
 interface Props {
   units: FieldUnit[];
+  tasks?: Task[];
   map: L.Map | null;
   mode: ToolMode;
   setMode: (mode: ToolMode) => void;
+  isOnline?: boolean;
 }
 
 /**
@@ -26,7 +47,11 @@ interface Props {
  * 3. Unit Navigation: handleUnitClick uses Leaflet's flyTo. If units move rapidly, 
  *    consider a 'follow mode' toggle.
  */
-export default function CommandSidePanel({ units, map, mode, setMode }: Props) {
+export default function CommandSidePanel({ units, tasks = [], map, mode, setMode, isOnline = true }: Props) {
+  const [activeTab, setActiveTab] = useState<"fleet" | "tasks">("tasks");
+  const completeTask = useTaskStore((s) => s.completeTask);
+  const storeTeams = useTeamStore((s) => s.teams);
+
   const tools = [
     { id: "CURSOR" as ToolMode, icon: MousePointer2, label: "Manuel Atama" },
     { id: "PEN" as ToolMode, icon: PenTool, label: "Bölge Çiz" },
@@ -38,6 +63,21 @@ export default function CommandSidePanel({ units, map, mode, setMode }: Props) {
       map.flyTo(unit.coords, 16, { animate: true, duration: 1.5 });
     }
   };
+
+  const handleTaskClick = (task: Task) => {
+    if (map) {
+      map.flyTo([task.lat, task.lng], 16, { animate: true, duration: 1.5 });
+    }
+  };
+
+  const handleDispatch = async (taskId: number, status: Task["status"]) => {
+    await completeTask(taskId, status);
+  };
+
+  // Task counts
+  const pendingTasks = tasks.filter((t) => t.status === "pending");
+  const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "assigned");
+  const backupTasks = tasks.filter((t) => t.status === "needs_backup");
 
   return (
     <div className="absolute left-6 top-6 bottom-6 w-80 glass-panel flex flex-col pointer-events-auto border-white/5 z-[1005]">
@@ -69,65 +109,198 @@ export default function CommandSidePanel({ units, map, mode, setMode }: Props) {
         </div>
       </div>
 
-      {/* SECTION: FLEET INTELLIGENCE */}
+      {/* TAB SWITCHER */}
+      <div className="flex border-b border-white/10">
+        <button
+          onClick={() => setActiveTab("tasks")}
+          className={`flex-1 py-2 text-[9px] font-bold tracking-[0.15em] uppercase transition-colors ${
+            activeTab === "tasks"
+              ? "text-blue-400 border-b-2 border-blue-500 bg-blue-500/5"
+              : "text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          GÖREV KUYRUĞU ({pendingTasks.length + activeTasks.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("fleet")}
+          className={`flex-1 py-2 text-[9px] font-bold tracking-[0.15em] uppercase transition-colors ${
+            activeTab === "fleet"
+              ? "text-blue-400 border-b-2 border-blue-500 bg-blue-500/5"
+              : "text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          FİLO ({units.length})
+        </button>
+      </div>
+
+      {/* SECTION: CONTENT */}
       <div className="p-4 flex-1 flex flex-col overflow-hidden">
-        <header className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+        <header className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
             <Zap className="h-3 w-3 text-blue-400 fill-blue-400/20" />
             <h3 className="text-white text-[10px] font-bold tracking-[0.2em] uppercase">
-              FLEET_INTELLIGENCE
+              {activeTab === "tasks" ? "TASK_QUEUE" : "FLEET_INTELLIGENCE"}
             </h3>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] font-mono text-gray-400">SYNC_OK</span>
+            <div className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+            <span className="text-[9px] font-mono text-gray-400">{isOnline ? "SYNC_OK" : "OFFLINE"}</span>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto space-y-2.5 pr-2 scrollbar-none">
-          {units.map((unit) => (
-            <button
-              key={unit.id}
-              onClick={() => handleUnitClick(unit)}
-              className="w-full group relative overflow-hidden p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-blue-500/30 rounded-xl transition-all duration-300 text-left flex flex-col gap-2.5"
-            >
-              <div className={`absolute top-0 right-0 w-16 h-16 blur-2xl opacity-5 transition-opacity group-hover:opacity-15 ${
-                unit.statusType === UnitStatus.IDLE ? "bg-emerald-500" : 
-                unit.statusType === UnitStatus.BUSY ? "bg-red-500" : "bg-gray-500"
-              }`} />
-
-              <div className="flex justify-between items-start relative z-10">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-mono text-gray-500 tracking-tighter">NODE_ADDR: {unit.ip}</span>
-                  <h4 className="text-[13px] font-bold text-gray-100 group-hover:text-blue-400 transition-colors tracking-tight">
-                    Unit_{unit.id === "1" ? "ALFA" : unit.id === "2" ? "BRAVO" : unit.id === "3" ? "CHARLIE" : "DELTA"}
-                  </h4>
+        {/* TASK QUEUE TAB */}
+        {activeTab === "tasks" && (
+          <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-none">
+            {/* Backup requests first (critical) */}
+            {backupTasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => handleTaskClick(task)}
+                className="cursor-pointer w-full group relative overflow-hidden p-3 bg-red-500/10 hover:bg-red-500/15 border border-red-500/30 rounded-xl transition-all duration-300 text-left animate-pulse"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                    <span className="text-[11px] font-bold text-red-400">DESTEK TALEBİ</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-red-300">#{task.id}</span>
                 </div>
-                <div className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter border ${
-                  unit.statusType === UnitStatus.IDLE ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
-                  unit.statusType === UnitStatus.BUSY ? "bg-red-500/10 text-red-400 border-red-500/20" : 
-                  "bg-gray-500/10 text-gray-400 border-gray-500/20"
-                }`}>
-                  {unit.statusType}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-400 font-mono relative z-10">
-                <div className="flex items-center gap-1.5 bg-black/30 p-1.5 rounded-md border border-white/5">
-                  <Battery className={`h-2.5 w-2.5 ${unit.battery < 20 ? "text-red-500 animate-pulse" : "text-emerald-500"}`} />
-                  <span>%{unit.battery}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-black/30 p-1.5 rounded-md border border-white/5">
-                  <Signal className="h-2.5 w-2.5 text-blue-500" />
-                  <span>{unit.ping}ms</span>
-                </div>
-                <div className="flex items-center justify-center bg-black/30 p-1.5 rounded-md border border-white/5 text-[8px] text-gray-300">
-                  {unit.status}
+                {task.address && <p className="text-[10px] text-gray-400 mt-1.5 truncate">{task.address}</p>}
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "assigned"); }}
+                    className="flex-1 text-[8px] font-bold bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded-lg py-1.5 transition-colors"
+                  >
+                    EKİP ATA
+                  </button>
                 </div>
               </div>
-            </button>
-          ))}
-        </div>
+            ))}
+
+            {/* Pending tasks */}
+            {pendingTasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => handleTaskClick(task)}
+                className="cursor-pointer w-full group relative overflow-hidden p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-blue-500/30 rounded-xl transition-all duration-300 text-left"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-mono text-gray-500">TASK #{task.id}</span>
+                    <span className="text-[12px] font-bold text-gray-100 group-hover:text-blue-400 transition-colors">
+                      {task.address || `Konum: ${task.lat.toFixed(4)}, ${task.lng.toFixed(4)}`}
+                    </span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter border ${PRIORITY_COLORS[task.priority] || ""}`}>
+                    {task.priority}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Clock className="h-2.5 w-2.5 text-gray-500" />
+                  <span className="text-[9px] text-gray-500">{STATUS_LABELS[task.status] ?? task.status}</span>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "assigned"); }}
+                    className="flex-1 text-[8px] font-bold bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded-lg py-1.5 transition-colors"
+                  >
+                    EKİP ATA
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "false_alarm"); }}
+                    className="text-[8px] font-bold bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 border border-gray-500/30 rounded-lg py-1.5 px-3 transition-colors"
+                  >
+                    İPTAL
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Active tasks */}
+            {activeTasks.map((task) => (
+              <div
+                key={task.id}
+                onClick={() => handleTaskClick(task)}
+                className="cursor-pointer w-full p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-left"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-mono text-emerald-400/60">AKTİF #{task.id}</span>
+                    <span className="text-[11px] font-bold text-gray-200">
+                      {task.address || `Konum: ${task.lat.toFixed(4)}, ${task.lng.toFixed(4)}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3 text-emerald-400" />
+                    <span className="text-[8px] text-emerald-400 font-bold">{STATUS_LABELS[task.status]}</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "resolved"); }}
+                    className="flex-1 text-[8px] font-bold bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 rounded-lg py-1.5 transition-colors"
+                  >
+                    TAMAMLANDI
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {tasks.length === 0 && (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-gray-600 font-mono text-xs animate-pulse tracking-tighter">GÖREV_KUYRUĞU_BOŞ</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* FLEET TAB */}
+        {activeTab === "fleet" && (
+          <div className="flex-1 overflow-y-auto space-y-2.5 pr-2 scrollbar-none">
+            {units.map((unit) => (
+              <button
+                key={unit.id}
+                onClick={() => handleUnitClick(unit)}
+                className="w-full group relative overflow-hidden p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-blue-500/30 rounded-xl transition-all duration-300 text-left flex flex-col gap-2.5"
+              >
+                <div className={`absolute top-0 right-0 w-16 h-16 blur-2xl opacity-5 transition-opacity group-hover:opacity-15 ${
+                  unit.statusType === UnitStatus.IDLE ? "bg-emerald-500" : 
+                  unit.statusType === UnitStatus.BUSY ? "bg-red-500" : "bg-gray-500"
+                }`} />
+
+                <div className="flex justify-between items-start relative z-10">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-mono text-gray-500 tracking-tighter">NODE_ADDR: {unit.ip}</span>
+                    <h4 className="text-[13px] font-bold text-gray-100 group-hover:text-blue-400 transition-colors tracking-tight">
+                      Unit_{unit.id === "1" ? "ALFA" : unit.id === "2" ? "BRAVO" : unit.id === "3" ? "CHARLIE" : "DELTA"}
+                    </h4>
+                  </div>
+                  <div className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter border ${
+                    unit.statusType === UnitStatus.IDLE ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
+                    unit.statusType === UnitStatus.BUSY ? "bg-red-500/10 text-red-400 border-red-500/20" : 
+                    "bg-gray-500/10 text-gray-400 border-gray-500/20"
+                  }`}>
+                    {unit.statusType}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-400 font-mono relative z-10">
+                  <div className="flex items-center gap-1.5 bg-black/30 p-1.5 rounded-md border border-white/5">
+                    <Battery className={`h-2.5 w-2.5 ${unit.battery < 20 ? "text-red-500 animate-pulse" : "text-emerald-500"}`} />
+                    <span>%{unit.battery}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-black/30 p-1.5 rounded-md border border-white/5">
+                    <Signal className="h-2.5 w-2.5 text-blue-500" />
+                    <span>{unit.ping}ms</span>
+                  </div>
+                  <div className="flex items-center justify-center bg-black/30 p-1.5 rounded-md border border-white/5 text-[8px] text-gray-300">
+                    {unit.status}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* FOOTER: SYSTEM INFRA */}

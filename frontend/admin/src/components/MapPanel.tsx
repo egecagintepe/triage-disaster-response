@@ -4,10 +4,11 @@
  */
 
 import { useState } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline, CircleMarker } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode } from "../types";
+import type { Task } from "../services/localDb";
 import CommandSidePanel from "./CommandSidePanel";
 
 const createUnitIcon = (status: UnitStatus) => {
@@ -28,11 +29,42 @@ const createUnitIcon = (status: UnitStatus) => {
   });
 };
 
+const createTaskIcon = (priority: string, status: string) => {
+  const color = priority === "RED" ? "#EF4444"
+              : priority === "YELLOW" ? "#F59E0B"
+              : "#10B981";
+
+  const pulse = status === "pending" || status === "needs_backup";
+
+  return L.divIcon({
+    className: "custom-div-icon",
+    html: `
+      <div class="relative flex items-center justify-center">
+        ${pulse ? `<div class="absolute w-6 h-6 rounded-sm opacity-40" style="background-color: ${color}; animation: radar-ping 1.5s infinite; transform: rotate(45deg);"></div>` : ""}
+        <div class="relative w-3 h-3 rounded-sm border border-white/50 shadow-lg" style="background-color: ${color}; transform: rotate(45deg);"></div>
+      </div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "BEKLİYOR",
+  assigned: "ATANDI",
+  in_progress: "DEVAM EDİYOR",
+  needs_backup: "DESTEK GEREKLİ",
+  false_alarm: "YANLIŞ ALARM",
+  resolved: "TAMAMLANDI",
+};
+
 interface Props {
   units: FieldUnit[];
   riskZones: RiskZone[];
   toolMode: ToolMode;
   setToolMode: (mode: ToolMode) => void;
+  tasks?: Task[];
+  isOnline?: boolean;
 }
 
 /**
@@ -44,7 +76,7 @@ interface Props {
  * 2. Risk Zones: Polygons can be fetched from /api/geofence or /api/intelligence/zones.
  * 3. Interactions: Click events on map coordinates can trigger 'Move To' commands to units.
  */
-export default function MapPanel({ units, riskZones, toolMode, setToolMode }: Props) {
+export default function MapPanel({ units, riskZones, toolMode, setToolMode, tasks = [], isOnline = true }: Props) {
   const [map, setMap] = useState<L.Map | null>(null);
   const position: [number, number] = [41.0082, 28.9784];
 
@@ -68,6 +100,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode }: Pr
           </defs>
         </svg>
         
+        {/* Risk Zones */}
         {riskZones.map((zone) => {
           let pathOptions: L.PathOptions = {
             color: zone.type === ZoneType.URGENT ? "#EF4444" : 
@@ -96,6 +129,30 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode }: Pr
           );
         })}
 
+        {/* Task Markers — diamond-shaped, color = priority */}
+        {tasks.map((task) => (
+          <Marker
+            key={`task-${task.id}`}
+            position={[task.lat, task.lng]}
+            icon={createTaskIcon(task.priority, task.status)}
+          >
+            <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+              <div className="bg-gray-950/90 text-gray-50 border border-white/10 p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
+                <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">TASK://{task.id}</p>
+                <div className="space-y-0.5">
+                  <p>ÖNCELİK: <span className={
+                    task.priority === "RED" ? "text-red-400 font-bold" :
+                    task.priority === "YELLOW" ? "text-amber-400" : "text-emerald-400"
+                  }>{task.priority}</span></p>
+                  <p>DURUM: <span className="text-gray-300">{STATUS_LABELS[task.status] ?? task.status}</span></p>
+                  {task.address && <p className="text-gray-400 text-[9px] mt-1 border-t border-white/5 pt-1">{task.address}</p>}
+                </div>
+              </div>
+            </Tooltip>
+          </Marker>
+        ))}
+
+        {/* Unit Markers + destination lines */}
         {units.map((unit) => (
           <div key={unit.id}>
             {unit.destination && unit.statusType === UnitStatus.BUSY && (
@@ -123,7 +180,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode }: Pr
       {/* HUD & Panels - Siblings of MapContainer to ensure top-layer render */}
       <div className="absolute inset-0 pointer-events-none z-[1000]">
         <div className="pointer-events-auto h-full w-full">
-          <CommandSidePanel units={units} map={map} mode={toolMode} setMode={setToolMode} />
+          <CommandSidePanel units={units} tasks={tasks} map={map} mode={toolMode} setMode={setToolMode} isOnline={isOnline} />
           
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel p-2.5 px-6 flex items-center gap-6 pointer-events-none border-blue-500/20">
             <div className="flex flex-col gap-0.5">
@@ -134,6 +191,13 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode }: Pr
             <div className="flex flex-col gap-0.5">
               <span className="text-[9px] text-gray-500 font-bold tracking-tighter">OPERATIONAL_MODE</span>
               <span className="text-[11px] font-mono text-emerald-400">{toolMode}</span>
+            </div>
+            <div className="h-6 w-px bg-white/10" />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[9px] text-gray-500 font-bold tracking-tighter">NETWORK</span>
+              <span className={`text-[11px] font-mono ${isOnline ? "text-emerald-400" : "text-red-400 animate-pulse"}`}>
+                {isOnline ? "ONLINE" : "OFFLINE"}
+              </span>
             </div>
           </div>
         </div>

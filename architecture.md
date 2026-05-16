@@ -1803,13 +1803,13 @@ triage-v2/
 **Çıktı:** Offline mode çalışıyor, reconnect sonrası sync oluyor ✅
 
 #### Sprint 2.2: Admin Dashboard
-- [ ] Leaflet harita entegrasyonu
-- [ ] Zone polygon rendering
-- [ ] Team location tracking
-- [ ] Task queue display
-- [ ] Real-time WebSocket updates
+- [X] Leaflet harita entegrasyonu
+- [X] Zone polygon rendering
+- [X] Team location tracking
+- [X] Task queue display
+- [X] Real-time WebSocket updates
 
-**Çıktı:** Admin dashboard operasyonel
+**Çıktı:** Admin dashboard operasyonel ✅
 
 #### Sprint 2.3: Mobile Field App
 - [ ] Active task card
