@@ -400,11 +400,11 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
                     <p>DURUM: <span className="text-gray-300">{STATUS_LABELS[task.status] ?? task.status}</span></p>
                     <div className="mt-1 border-t border-white/5 pt-1">
                       <p className="text-gray-400 text-[9px]"><span className="text-gray-500">BÖLGE:</span> {task.address || kandilliEq?.title?.split(" ")[0] || "Bilinmeyen"}</p>
-                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">ŞİDDET:</span> <span className="text-amber-400">{kandilliEq?.mag || "?"} M</span></p>
-                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">DERİNLİK:</span> <span className="text-blue-400">{kandilliEq?.depth || "?"} km</span></p>
-                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">KIRIK UZUNLUĞU:</span> <span className="text-red-400">{kandilliEq?.rupture_length_km || "?"} km</span></p>
-                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">ARTÇI TAHMİNİ:</span> <span className="text-orange-400">{kandilliEq?.estimated_aftershocks || "?"} adet / 6 saat</span></p>
-                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">KAYNAK:</span> <span className="text-blue-400">[{kandilliEq?.source || "AFAD/Kandilli"}]</span></p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">ŞİDDET:</span> <span className="text-amber-400">{((task as any).metadata?.magnitude) || kandilliEq?.mag || "?"} M</span></p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">DERİNLİK:</span> <span className="text-blue-400">{((task as any).metadata?.depth_km) || kandilliEq?.depth || "?"} km</span></p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">KIRIK UZUNLUĞU:</span> <span className="text-red-400">{((task as any).metadata?.rupture_length_km) || kandilliEq?.rupture_length_km || "?"} km</span></p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">ARTÇI TAHMİNİ:</span> <span className="text-orange-400">{((task as any).metadata?.estimated_aftershocks) || kandilliEq?.estimated_aftershocks || "?"} adet / 6 saat</span></p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">KAYNAK:</span> <span className="text-blue-400">[{((task as any).metadata?.source) || kandilliEq?.source || "AFAD/Kandilli"}]</span></p>
                     </div>
                   </div>
                 </div>

@@ -214,12 +214,12 @@ export default function App() {
     <div className="flex flex-col h-screen w-full bg-black overflow-hidden font-sans">
       {/* Emergency Alert Overlay */}
       {emergencyAlert && (
-        <div className="fixed inset-0 z-[99999] bg-red-700 flex flex-col items-center justify-center animate-pulse">
+        <div className="fixed inset-0 z-[99999] bg-red-700/90 flex flex-col items-center justify-center">
           <div className="text-white text-center p-8">
             <div className="text-8xl mb-6">🚨</div>
-            <h1 className="text-4xl font-black uppercase tracking-wider mb-4">KIRMIZI ALARM</h1>
-            <p className="text-xl font-bold mb-8">{emergencyAlert.message}</p>
-            <p className="text-gray-200 mt-4 text-sm animate-pulse">Siren 10 saniye boyunca çalacak...</p>
+            <h1 className="text-4xl font-black uppercase tracking-wider mb-4 animate-[pulse_1s_cubic-bezier(0.4,0,0.6,1)_infinite]">KIRMIZI ALARM</h1>
+            <p className="text-xl font-bold mb-8 animate-[pulse_1s_cubic-bezier(0.4,0,0.6,1)_infinite]">{emergencyAlert.message}</p>
+            <p className="text-gray-200 mt-4 text-sm animate-[pulse_1s_cubic-bezier(0.4,0,0.6,1)_infinite]">Siren 10 saniye boyunca çalacak...</p>
           </div>
         </div>
       )}

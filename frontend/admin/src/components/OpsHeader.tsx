@@ -318,7 +318,7 @@ export default function OpsHeader({ isOnline, teamCount, taskCount, logs = [] }:
               <X className="h-5 w-5" />
             </button>
             <div className="h-10 w-10 mb-4 relative">
-              <AlertTriangle className="h-10 w-10 text-red-500 absolute inset-0 animate-pulse" />
+              <AlertTriangle className="h-10 w-10 text-red-500 absolute inset-0 animate-[pulse_1s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Kritik Acil Durum İletisi</h3>
             <p className="text-gray-400 text-xs mb-6">Tüm saha personeline iletilecek acil durum mesajını girin. Bu işlem geri alınamaz ve anında tüm cihazlarda siren çaldırır.</p>

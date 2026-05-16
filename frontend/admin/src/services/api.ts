@@ -90,7 +90,8 @@ export const api = {
     request<T>(path, { method: 'DELETE' }),
 };
 
-/** WebSocket base URL (derived from API URL) */
 export const WS_BASE =
   import.meta.env.VITE_WS_URL ||
-  API_BASE_URL.replace(/^http/, 'ws');
+  (typeof window !== 'undefined' && window.location.protocol === 'https:'
+    ? API_BASE_URL.replace(/^http:/, 'wss:').replace(/^https:/, 'wss:')
+    : API_BASE_URL.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:'));

@@ -125,6 +125,7 @@ class WebSocketManager {
     this.socket.addEventListener('message', (ev) => {
       try {
         const msg = JSON.parse(ev.data);
+        if (!msg || typeof msg !== 'object') return;
         this.handleMessage(msg);
       } catch (err) {
         console.error('[WS] Failed to parse message:', err);
@@ -137,6 +138,7 @@ class WebSocketManager {
   /* ---------------------------------------------------------------- */
 
   private async handleMessage(msg: Record<string, unknown>): Promise<void> {
+    if (!msg || !msg.type) return;
     const type = msg.type as string;
 
     switch (type) {

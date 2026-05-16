@@ -35,7 +35,7 @@ export function calculateTaskSplit(allTasks: Task[]): { toTransfer: Task[]; toKe
 
   for (const priority of ['RED', 'YELLOW', 'GREEN'] as const) {
     const group = grouped[priority];
-    const splitCount = Math.floor(group.length / 2);
+    const splitCount = group.length === 1 ? 1 : Math.floor(group.length / 2);
 
     for (let i = 0; i < group.length; i++) {
       if (i < splitCount) {
@@ -68,12 +68,12 @@ function buildBulkPayload(tasks: Task[]): string {
 
 export default function QrShareModal({ tasks, onClose }: Props) {
   // Bug fix: Filter out terminal-status tasks before generating QR
-  const shareableTasks = tasks.filter(t =>
+  const shareableTasks = useMemo(() => tasks.filter(t =>
     t.status !== 'completed' &&
     t.status !== 'resolved' &&
     t.status !== 'cancelled' &&
     t.status !== 'false_alarm'
-  );
+  ), [tasks]);
   const { toTransfer, toKeep } = useMemo(() => calculateTaskSplit(shareableTasks), [shareableTasks]);
   const [handedOff, setHandedOff] = useState(false);
 

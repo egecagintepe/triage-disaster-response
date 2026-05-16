@@ -36,6 +36,7 @@ const MOCK_KANDILLI = [
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Bekliyor",
+  pending_approval: "Onay Bekliyor",
   assigned: "Atandı",
   in_progress: "Devam Ediyor",
   needs_backup: "Destek Gerekli",
@@ -105,7 +106,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
   };
 
   // Task counts
-  const pendingTasks = tasks.filter((t) => t.status === "pending");
+  const pendingTasks = tasks.filter((t) => t.status === "pending" || t.status === "pending_approval");
   const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "assigned");
   const backupTasks = tasks.filter((t) => t.status === "needs_backup");
 
