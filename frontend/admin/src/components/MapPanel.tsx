@@ -4,17 +4,27 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline, CircleMarker, FeatureGroup, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Tooltip, Polygon, Polyline, FeatureGroup, useMapEvents } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-cluster";
 import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
-import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode } from "../types";
+import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode, LogType } from "../types";
 import type { Task } from "../services/localDb";
 import { db } from "../services/localDb";
 import { useZoneStore } from "../stores/zoneStore";
 import { api } from "../services/api";
 import CommandSidePanel from "./CommandSidePanel";
+import OfflineTileLayer from "./OfflineTileLayer";
+import HeatmapLayer from "./HeatmapLayer";
+
+const translatePriority = (p: string) => {
+  if (p === "RED" || p === "CRITICAL" || p === "KRİTİK") return "KRİTİK";
+  if (p === "HIGH" || p === "YÜKSEK") return "YÜKSEK";
+  if (p === "YELLOW" || p === "MEDIUM" || p === "ORTA") return "ORTA";
+  return "DÜŞÜK";
+};
 
 function MouseTracker() {
   useMapEvents({
@@ -44,9 +54,11 @@ const createUnitIcon = (status: UnitStatus) => {
   });
 };
 
-const createTaskIcon = (priority: string, status: string) => {
-  const color = priority === "RED" ? "#EF4444"
-              : priority === "YELLOW" ? "#F59E0B"
+const createTaskIcon = (rawPriority: string, status: string) => {
+  const p = translatePriority(rawPriority);
+  const color = p === "KRİTİK" ? "#EF4444"
+              : p === "YÜKSEK" ? "#F97316"
+              : p === "ORTA" ? "#F59E0B"
               : "#10B981";
 
   const pulse = status === "pending" || status === "needs_backup";
@@ -94,6 +106,18 @@ interface Props {
 export default function MapPanel({ units, riskZones, toolMode, setToolMode, tasks = [], isOnline = true }: Props) {
   const [map, setMap] = useState<L.Map | null>(null);
   const position: [number, number] = [41.0082, 28.9784];
+  const [kandilliEq, setKandilliEq] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("https://api.orhanaydogdu.com.tr/deprem/kandilli/live")
+      .then(res => res.json())
+      .then(data => {
+        if (data.result && data.result.length > 0) {
+          setKandilliEq(data.result[0]);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   // Restore the programmatic drawing listener
   useEffect(() => {
@@ -116,23 +140,43 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         // Add layer to map visually so it doesn't disappear immediately
         map.addLayer(layer);
 
+        const tempId = `temp-${Date.now()}`;
+        const newZonePoints = coordinates[0].map((c: any) => [c[1], c[0]] as [number, number]);
+        useZoneStore.getState().addZone({
+          id: tempId,
+          type: ZoneType.MEDIUM,
+          score: 70,
+          points: newZonePoints
+        });
+
         try {
-          await api.post('/api/v1/zones', {
+          const res = await api.post('/api/v1/zones', {
             name: `Bölge ${Math.floor(Math.random() * 1000)}`,
             priority_score: 3.5, 
             geometry: geojson
           });
+          
+          if (res && res.id) {
+            useZoneStore.getState().updateZone({
+              id: String(res.id),
+              type: ZoneType.MEDIUM,
+              score: 70,
+              points: newZonePoints
+            });
+            useZoneStore.getState().deleteZone(tempId);
+          }
           
           // Log manual override
           window.dispatchEvent(new CustomEvent('map_action_log', { 
             detail: { action: "Yeni Risk Bölgesi İşaretlendi", entity: "[MANUAL_OVERRIDE]", type: LogType.SYSTEM } 
           }));
           
-          // Remove manual layer, let WebSocket update trigger React render
+          // Remove manual layer, let WebSocket/Zustand update trigger React render
           map.removeLayer(layer);
         } catch (err) {
           console.error("Bölge oluşturulamadı:", err);
           map.removeLayer(layer); // remove if failed
+          useZoneStore.getState().deleteZone(tempId);
         }
         
         setToolMode("CURSOR");
@@ -150,14 +194,21 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
   const handleZoneClick = async (zone: RiskZone) => {
     if (toolMode === "OVERRIDE") {
       let nextPriorityScore = 4.5;
-      if (zone.type === ZoneType.URGENT) nextPriorityScore = 3.0; // RED -> YELLOW
-      else if (zone.type === ZoneType.MEDIUM) nextPriorityScore = 1.5; // YELLOW -> GREEN
-      else nextPriorityScore = 4.5; // GREEN/SAFE/NO_GO -> RED
+      let nextType = ZoneType.MEDIUM;
+      let nextScore = 90;
+      if (zone.type === ZoneType.URGENT) { nextPriorityScore = 3.0; nextType = ZoneType.MEDIUM; nextScore = 60; }
+      else if (zone.type === ZoneType.MEDIUM) { nextPriorityScore = 1.5; nextType = ZoneType.SAFE; nextScore = 30; }
+      else { nextPriorityScore = 4.5; nextType = ZoneType.URGENT; nextScore = 90; }
+
+      // Optimistic update
+      useZoneStore.getState().updateZone({ ...zone, type: nextType, score: nextScore });
 
       try {
         await api.patch(`/api/v1/zones/${zone.id}`, { priority_score: nextPriorityScore });
       } catch (e) {
         console.error("Zone priority override failed", e);
+        // Rollback
+        useZoneStore.getState().updateZone(zone);
       }
     } else if (toolMode === "ERASER") {
       // 1. Instant optimistic UI update
@@ -183,6 +234,21 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
     }
   };
 
+  const heatmapPoints: [number, number, number][] = [
+    ...tasks.filter(t => t.status !== "resolved").map((t): [number, number, number] => {
+      const weight = t.priority === "KRİTİK" || t.priority === "CRITICAL" || t.priority === "RED" ? 1.0 :
+                     t.priority === "YÜKSEK" || t.priority === "HIGH" ? 0.8 :
+                     t.priority === "ORTA" || t.priority === "YELLOW" || t.priority === "MEDIUM" ? 0.6 : 0.4;
+      return [t.lat, t.lng, weight];
+    }),
+    ...riskZones.map((z): [number, number, number] => {
+      if (!z.points || z.points.length === 0) return [0, 0, 0];
+      const poly = L.polygon(z.points as L.LatLngTuple[]);
+      const center = poly.getBounds().getCenter();
+      return [center.lat, center.lng, (z.score || 50) / 100];
+    }).filter(p => p[0] !== 0)
+  ];
+
   return (
     <div className="absolute inset-0 z-0 bg-black">
       <MapContainer
@@ -197,7 +263,12 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         ref={setMap}
       >
         <MouseTracker />
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+        <OfflineTileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap &copy; CARTO'
+        />
+
+        <HeatmapLayer points={heatmapPoints} />
 
         <svg style={{ position: "absolute", width: 0, height: 0 }}>
           <defs>
@@ -265,55 +336,63 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           );
         })}
 
-        {/* Task Markers — diamond-shaped, color = priority */}
-        {tasks.filter(t => t.status !== "resolved" && t.status !== "false_alarm").map((task) => (
-          <Marker
-            key={`task-${task.id}`}
-            position={[task.lat, task.lng]}
-            icon={createTaskIcon(task.priority, task.status)}
-            eventHandlers={{
-              click: () => handleTaskClick(task)
-            }}
-          >
-            <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-              <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
-                <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">TASK://{task.id}</p>
-                <div className="space-y-0.5">
-                  <p>ÖNCELİK: <span className={
-                    task.priority === "RED" ? "text-red-400 font-bold" :
-                    task.priority === "YELLOW" ? "text-amber-400" : "text-emerald-400"
-                  }>{task.priority}</span></p>
-                  <p>DURUM: <span className="text-gray-300">{STATUS_LABELS[task.status] ?? task.status}</span></p>
-                  {task.address && <p className="text-gray-400 text-[9px] mt-1 border-t border-white/5 pt-1">{task.address}</p>}
-                </div>
-              </div>
-            </Tooltip>
-          </Marker>
-        ))}
-
-        {/* Unit Markers + destination lines */}
-        {units.map((unit) => (
-          <div key={unit.id}>
-            {unit.destination && unit.statusType === UnitStatus.BUSY && (
-              <Polyline 
-                positions={[unit.coords, unit.destination]} 
-                pathOptions={{ color: "#3B82F6", weight: 1, dashArray: "10, 15", opacity: 0.4 }} 
-              />
-            )}
-            <Marker position={unit.coords} icon={createUnitIcon(unit.statusType)}>
+        {/* Marker Clusters */}
+        <MarkerClusterGroup chunkedLoading maxClusterRadius={40}>
+          {/* Task Markers — diamond-shaped, color = priority */}
+          {tasks.filter(t => t.status !== "resolved" && t.status !== "false_alarm").map((task) => (
+            <Marker
+              key={`task-${task.id}`}
+              position={[task.lat, task.lng]}
+              icon={createTaskIcon(task.priority, task.status)}
+              eventHandlers={{
+                click: () => handleTaskClick(task)
+              }}
+            >
               <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-                <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md">
-                  <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">UNIT://{unit.ip}</p>
+                <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
+                  <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">TASK://{task.id}</p>
                   <div className="space-y-0.5">
-                    <p>STATUS: <span className="text-gray-300">{unit.status}</span></p>
-                    <p>BATTERY: <span className={unit.battery < 20 ? "text-red-500 animate-pulse" : ""}>%{unit.battery}</span></p>
-                    <p>P_LATENCY: {unit.ping}ms</p>
+                    <p>ÖNCELİK: <span className={
+                      translatePriority(task.priority) === "KRİTİK" ? "text-red-500 font-bold" :
+                      translatePriority(task.priority) === "YÜKSEK" ? "text-orange-400 font-bold" :
+                      translatePriority(task.priority) === "ORTA" ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"
+                    }>{translatePriority(task.priority)}</span></p>
+                    <p>DURUM: <span className="text-gray-300">{STATUS_LABELS[task.status] ?? task.status}</span></p>
+                    <div className="mt-1 border-t border-white/5 pt-1">
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">BÖLGE:</span> {kandilliEq?.location_properties?.closestCity?.name || kandilliEq?.title?.split(" ")[0] || "Bilinmeyen Koordinat"}</p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">ŞİDDET:</span> <span className="text-amber-400">{kandilliEq?.mag || "?"} M</span></p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">DERİNLİK:</span> <span className="text-blue-400">{kandilliEq?.depth || "?"} km</span></p>
+                    </div>
                   </div>
                 </div>
               </Tooltip>
             </Marker>
-          </div>
-        ))}
+          ))}
+
+          {/* Unit Markers + destination lines */}
+          {units.map((unit) => (
+            <div key={unit.id}>
+              {unit.destination && unit.statusType === UnitStatus.BUSY && (
+                <Polyline 
+                  positions={[unit.coords, unit.destination]} 
+                  pathOptions={{ color: "#3B82F6", weight: 1, dashArray: "10, 15", opacity: 0.4 }} 
+                />
+              )}
+              <Marker position={unit.coords} icon={createUnitIcon(unit.statusType)}>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                  <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md">
+                    <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">UNIT://{unit.ip}</p>
+                    <div className="space-y-0.5">
+                      <p>STATUS: <span className="text-gray-300">{unit.status}</span></p>
+                      <p>BATTERY: <span className={unit.battery < 20 ? "text-red-500 animate-pulse" : ""}>%{unit.battery}</span></p>
+                      <p>P_LATENCY: {unit.ping}ms</p>
+                    </div>
+                  </div>
+                </Tooltip>
+              </Marker>
+            </div>
+          ))}
+        </MarkerClusterGroup>
       </MapContainer>
       
       {/* HUD & Panels - Siblings of MapContainer to ensure top-layer render */}

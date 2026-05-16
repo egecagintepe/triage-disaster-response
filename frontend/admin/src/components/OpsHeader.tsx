@@ -27,14 +27,14 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
   // Ops Clock tick
   useEffect(() => {
     const timer = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const h = String(Math.floor(elapsed / 3600)).padStart(2, "0");
-      const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
-      const s = String(elapsed % 60).padStart(2, "0");
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, "0");
+      const m = String(now.getMinutes()).padStart(2, "0");
+      const s = String(now.getSeconds()).padStart(2, "0");
       setUptime(`${h}:${m}:${s}`);
     }, 1000);
     return () => clearInterval(timer);
-  }, [startTime]);
+  }, []);
 
   const handlePanic = async () => {
     if (!alertMessage.trim()) return;
@@ -107,7 +107,7 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
           </button>
 
           <button
-            onClick={handlePanic}
+            onClick={() => setShowRedAlertModal(true)}
             disabled={alertSending}
             className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${
               alertSending
@@ -163,14 +163,13 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
               <X className="h-5 w-5" />
             </button>
             <AlertTriangle className="h-10 w-10 text-red-500 mb-4 animate-pulse" />
-            <h3 className="text-xl font-bold text-white mb-2 tracking-tight">KIRMIZI ALARM YAYINI</h3>
+            <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Kritik Acil Durum İletisi</h3>
             <p className="text-gray-400 text-xs mb-6">Tüm saha personeline iletilecek acil durum mesajını girin. Bu işlem geri alınamaz ve anında tüm cihazlarda siren çaldırır.</p>
             
-            <input 
-              type="text" 
+            <textarea 
               value={alertMessage} 
               onChange={(e) => setAlertMessage(e.target.value)} 
-              className="w-full bg-black border border-red-500/30 rounded p-3 text-white mb-4 focus:outline-none focus:border-red-500"
+              className="w-full h-32 bg-black border border-red-500/30 rounded p-3 text-white mb-4 focus:outline-none focus:border-red-500 resize-none"
               placeholder="Acil Durum Mesajı..."
             />
             
@@ -185,7 +184,7 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
                 onClick={handlePanic}
                 className="px-6 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-bold transition-colors text-sm"
               >
-                GÖNDER
+                TÜM SAHAYA İLET
               </button>
             </div>
           </div>

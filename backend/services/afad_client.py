@@ -19,6 +19,8 @@ from config import AFAD_API_URL
 # Kandilli community API (live earthquake data)
 KANDILLI_API_URL = "https://api.orhanaydogdu.com.tr/deprem/kandilli/live"
 
+_earthquake_window = []
+
 
 # --- Simulated Impact Zone Generator ---
 
@@ -222,9 +224,16 @@ async def fetch_latest_earthquake() -> dict:
             ),
         }
 
+        # Rolling Window of 50
+        global _earthquake_window
+        if not any(e["earthquake_id"] == earthquake["earthquake_id"] for e in _earthquake_window):
+            _earthquake_window.insert(0, earthquake)
+            if len(_earthquake_window) > 50:
+                _earthquake_window.pop()
+
         print(
             f"[KANDILLI] Live earthquake: M{magnitude} {location_name} "
-            f"({lat:.4f}, {lng:.4f}) depth={depth}km"
+            f"({lat:.4f}, {lng:.4f}) depth={depth}km | Window size: {len(_earthquake_window)}"
         )
         return earthquake
 

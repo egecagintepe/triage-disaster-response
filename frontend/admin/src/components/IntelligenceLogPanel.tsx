@@ -48,10 +48,10 @@ export default function IntelligenceLogPanel({ logs }: Props) {
             animate={{ x: 0 }}
             exit={{ x: 400 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute right-6 top-6 bottom-6 w-96 glass-panel flex flex-col overflow-hidden z-[1001] border-white/[0.04]"
+            className="absolute right-6 top-16 bottom-6 w-96 glass-panel flex flex-col overflow-hidden z-[1001] border-zinc-800"
           >
-      <div className="p-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
-        <h3 className="text-gray-400 text-[10px] font-bold tracking-[0.2em] uppercase">
+      <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-black/20">
+        <h3 className="text-gray-400 text-[11px] font-bold tracking-tighter uppercase">
           SON DURUM BİLDİRİMLERİ
         </h3>
         <span className="text-[9px] font-mono text-emerald-500 animate-pulse">● LIVE</span>
@@ -59,7 +59,7 @@ export default function IntelligenceLogPanel({ logs }: Props) {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col-reverse h-full scrollbar-none">
         {/* LOGS (reverse order) */}
-        <div className="flex flex-col-reverse gap-3 mt-4">
+        <ul className="flex flex-col-reverse gap-3 mt-4">
           <AnimatePresence initial={false}>
           {logs.map((log) => {
             let textColor = "text-gray-50";
@@ -81,12 +81,12 @@ export default function IntelligenceLogPanel({ logs }: Props) {
             }
 
             return (
-              <motion.div
+              <motion.li
                 key={log.id}
-                initial={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ type: "spring", stiffness: 300 }}
                 className={`p-3 rounded-lg text-[13px] border transition-all ${bgColor} ${borderColor} ${
                   log.type === LogType.CRITICAL ? "animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.2)]" : ""
                 }`}
@@ -99,44 +99,50 @@ export default function IntelligenceLogPanel({ logs }: Props) {
                     {log.entity} {log.action}
                   </p>
                 </div>
-              </motion.div>
+              </motion.li>
             );
           })}
-        </AnimatePresence>
+          </AnimatePresence>
+        </ul>
         
-        </div>
-
         {/* AI APPROVAL QUEUE (top) */}
         {pendingAiTasks.length > 0 && (
-          <div className="mb-4 space-y-2">
-            <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest border-b border-blue-500/20 pb-1 flex items-center gap-1">
+          <ul className="mb-4 space-y-2">
+            <div className="text-[11px] font-bold text-blue-400 uppercase tracking-tighter border-b border-zinc-800 pb-1 flex items-center gap-1">
               <Bot className="h-3 w-3" />
               AI Görev Onayı Bekliyor ({pendingAiTasks.length})
             </div>
             <AnimatePresence>
               {pendingAiTasks.map((task) => {
-                const isRed = task.priority === "RED" || task.priority === "CRITICAL";
-                const isYellow = task.priority === "YELLOW" || task.priority === "HIGH";
+                const priorityTr = task.priority === "RED" || task.priority === "CRITICAL" || task.priority === "KRİTİK" ? "KRİTİK"
+                  : task.priority === "HIGH" || task.priority === "YÜKSEK" ? "YÜKSEK"
+                  : task.priority === "YELLOW" || task.priority === "MEDIUM" || task.priority === "ORTA" ? "ORTA"
+                  : "DÜŞÜK";
+
+                const isKritik = priorityTr === "KRİTİK";
+                const isYuksek = priorityTr === "YÜKSEK";
+                const isOrta = priorityTr === "ORTA";
                 
-                const borderColor = isRed ? "border-red-500/50" : isYellow ? "border-amber-500/50" : "border-emerald-500/50";
-                const bgColor = isRed ? "bg-red-950/20" : isYellow ? "bg-amber-950/20" : "bg-emerald-950/20";
-                const glowColor = isRed ? "shadow-[0_0_15px_rgba(239,68,68,0.15)]" : isYellow ? "shadow-[0_0_15px_rgba(245,158,11,0.15)]" : "shadow-[0_0_15px_rgba(16,185,129,0.15)]";
-                const accentColor = isRed ? "bg-red-500" : isYellow ? "bg-amber-500" : "bg-emerald-500";
-                const textPriority = isRed ? "text-red-400" : isYellow ? "text-amber-400" : "text-emerald-400";
+                const borderColor = isKritik ? "border-red-500/50" : isYuksek ? "border-orange-500/50" : isOrta ? "border-amber-500/50" : "border-emerald-500/50";
+                const bgColor = isKritik ? "bg-red-950/20" : isYuksek ? "bg-orange-950/20" : isOrta ? "bg-amber-950/20" : "bg-emerald-950/20";
+                const glowColor = isKritik ? "shadow-[inset_0_0_15px_rgba(239,68,68,0.15)]" : isYuksek ? "shadow-[inset_0_0_15px_rgba(249,115,22,0.15)]" : isOrta ? "shadow-[inset_0_0_15px_rgba(245,158,11,0.15)]" : "shadow-[inset_0_0_15px_rgba(16,185,129,0.15)]";
+                const accentColor = isKritik ? "bg-red-500" : isYuksek ? "bg-orange-500" : isOrta ? "bg-amber-500" : "bg-emerald-500";
+                const textPriority = isKritik ? "text-red-400" : isYuksek ? "text-orange-400" : isOrta ? "text-amber-400" : "text-emerald-400";
                 
                 return (
-                <motion.div
+                <motion.li
                   key={`ai-task-${task.id}`}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 300 }}
                   className={`${bgColor} border ${borderColor} ${glowColor} rounded-md p-3 relative overflow-hidden`}
                 >
                   <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`} />
                   <div className="flex justify-between items-start pl-2">
                     <div>
                       <p className="text-white text-[13px] font-semibold">{task.address}</p>
-                      <p className={`${textPriority} text-[10px] font-bold mt-1 uppercase tracking-wider`}>ÖNCELİK: {task.priority}</p>
+                      <p className={`${textPriority} text-[10px] font-bold mt-1 uppercase tracking-wider`}>ÖNCELİK: {priorityTr}</p>
                       <p className="text-gray-400 text-[10px] mt-1.5 italic leading-tight">{task.notes}</p>
                     </div>
                     <button
@@ -147,11 +153,11 @@ export default function IntelligenceLogPanel({ logs }: Props) {
                       <CheckCircle2 className="h-4 w-4" />
                     </button>
                   </div>
-                </motion.div>
+                </motion.li>
                 );
               })}
             </AnimatePresence>
-          </div>
+          </ul>
         )}
         
         {logs.length === 0 && pendingAiTasks.length === 0 && (

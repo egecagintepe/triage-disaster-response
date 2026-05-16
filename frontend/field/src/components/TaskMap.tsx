@@ -1,6 +1,7 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import OfflineTileLayer from './OfflineTileLayer';
 
 const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   RED:    { bg: 'bg-red-500/20',    text: 'text-red-500',     label: 'YÜKSEK' },
@@ -70,8 +71,8 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
         doubleClickZoom={true}
         scrollWheelZoom={false}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        <OfflineTileLayer
+          attribution='&copy; OpenStreetMap'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <Marker position={[taskLat, taskLng]} icon={customIcon}>

@@ -9,21 +9,16 @@
  * Reference: architecture.md Section 8.2
  */
 
+import ReconnectingWebSocket from 'reconnecting-websocket';
 import { db } from './localDb';
 import { WS_BASE } from './api';
 import { syncQueue } from './syncQueue';
 import { useTaskStore } from '../stores/taskStore';
 import { useTeamStore } from '../stores/teamStore';
 
-const RECONNECT_DELAY_MS = 1_000;
-const MAX_RECONNECT_DELAY_MS = 10_000;
-const MAX_RECONNECT_ATTEMPTS = 50;
-
 class WebSocketManager {
-  private socket: WebSocket | null = null;
+  private socket: ReconnectingWebSocket | null = null;
   private deviceId: string = '';
-  private reconnectAttempts = 0;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalClose = false;
 
   /* ---------------------------------------------------------------- */
@@ -44,7 +39,6 @@ class WebSocketManager {
    */
   disconnect(): void {
     this.intentionalClose = true;
-    this.clearReconnectTimer();
     if (this.socket) {
       this.socket.close();
       this.socket = null;
@@ -102,41 +96,40 @@ class WebSocketManager {
     console.log(`[WS] Connecting to ${url}…`);
 
     try {
-      this.socket = new WebSocket(url);
+      this.socket = new ReconnectingWebSocket(url, [], {
+        maxReconnectionDelay: 10000,
+        minReconnectionDelay: 1000,
+        reconnectionDelayGrowFactor: 1.5,
+        maxRetries: 50,
+      });
     } catch (err) {
       console.error('[WS] Failed to create socket:', err);
-      this.scheduleReconnect();
       return;
     }
 
-    this.socket.onopen = () => {
+    this.socket.addEventListener('open', () => {
       console.log('[WS] Connected');
-      this.reconnectAttempts = 0;
       window.dispatchEvent(new CustomEvent('ws_status_change', { detail: true }));
       this.performFullSync();
-    };
+    });
 
-    this.socket.onclose = (ev) => {
+    this.socket.addEventListener('close', (ev) => {
       console.log(`[WS] Closed (code=${ev.code})`);
       window.dispatchEvent(new CustomEvent('ws_status_change', { detail: false }));
-      if (!this.intentionalClose) {
-        this.scheduleReconnect();
-      }
-    };
+    });
 
-    this.socket.onerror = (ev) => {
+    this.socket.addEventListener('error', (ev) => {
       console.error('[WS] Error:', ev);
-      // onclose will fire right after — reconnect handled there
-    };
+    });
 
-    this.socket.onmessage = (ev) => {
+    this.socket.addEventListener('message', (ev) => {
       try {
         const msg = JSON.parse(ev.data);
         this.handleMessage(msg);
       } catch (err) {
         console.error('[WS] Failed to parse message:', err);
       }
-    };
+    });
   }
 
   /* ---------------------------------------------------------------- */
@@ -294,32 +287,6 @@ class WebSocketManager {
   /* ---------------------------------------------------------------- */
   /*  Reconnection                                                     */
   /* ---------------------------------------------------------------- */
-
-  private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.error('[WS] Max reconnect attempts reached');
-      return;
-    }
-
-    const delay = Math.min(
-      RECONNECT_DELAY_MS * Math.pow(1.5, this.reconnectAttempts),
-      MAX_RECONNECT_DELAY_MS,
-    );
-
-    console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts + 1})`);
-    this.clearReconnectTimer();
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectAttempts++;
-      this.openSocket();
-    }, delay);
-  }
-
-  private clearReconnectTimer(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-  }
 }
 
 export const wsManager = new WebSocketManager();

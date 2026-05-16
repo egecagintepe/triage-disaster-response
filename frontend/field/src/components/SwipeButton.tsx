@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { motion, useMotionValue, useTransform, useSpring } from 'motion/react';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, useMotionValue, useTransform, animate } from 'motion/react';
+import { useDrag } from '@use-gesture/react';
 import { ChevronRight } from 'lucide-react';
 
 interface SwipeButtonProps {
@@ -17,34 +18,44 @@ export default function SwipeButton({ label, onConfirm, thumbColor, pulse }: Swi
   // Transform opacity based on drag position
   const opacity = useTransform(x, [0, 200], [1, 0]);
   
-  const handleDragEnd = (_: any, info: any) => {
-    if (trackRef.current) {
-      const trackWidth = trackRef.current.offsetWidth;
-      const thumbWidth = 64; // w-16
-      const threshold = (trackWidth - thumbWidth) * 0.8;
+  const bind = useDrag(({ movement: [mx], down, cancel }) => {
+    if (isSuccess) return;
 
-      if (info.point.x - trackRef.current.getBoundingClientRect().left >= threshold) {
-        setIsSuccess(true);
-        if (navigator.vibrate) navigator.vibrate(50);
-        onConfirm();
-        // Reset after a delay
-        setTimeout(() => {
-          x.set(0);
-          setIsSuccess(false);
-        }, 1000);
-      } else {
-        // Snap back
-        x.set(0);
-      }
+    if (!trackRef.current) return;
+    const trackWidth = trackRef.current.offsetWidth;
+    const thumbWidth = 64; // w-16
+    const maxBound = trackWidth - thumbWidth - 8;
+
+    if (mx >= maxBound * 0.9) {
+      setIsSuccess(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+      onConfirm();
+      if (cancel) cancel();
+      
+      animate(x, maxBound, { type: "spring", stiffness: 300, damping: 20 });
+      
+      setTimeout(() => {
+        setIsSuccess(false);
+        animate(x, 0, { type: "spring", stiffness: 300, damping: 20 });
+      }, 1000);
+      return;
     }
-  };
+
+    if (down) {
+      x.set(Math.max(0, Math.min(mx, maxBound)));
+    } else {
+      animate(x, 0, { type: "spring", stiffness: 300, damping: 20 });
+    }
+  }, { 
+    filterTaps: true,
+    axis: 'x'
+  });
 
   return (
     <div 
       ref={trackRef}
       className="relative h-[72px] w-full bg-gray-800 rounded-full flex items-center px-1 overflow-hidden"
     >
-      {/* Background track text */}
       <motion.div 
         style={{ opacity }}
         className="absolute inset-0 flex items-center justify-center font-bold text-lg text-gray-400 pointer-events-none select-none"
@@ -52,16 +63,11 @@ export default function SwipeButton({ label, onConfirm, thumbColor, pulse }: Swi
         {label}
       </motion.div>
 
-      {/* The Swipe Thumb */}
       <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: trackRef.current ? trackRef.current.offsetWidth - 68 : 300 }}
-        dragElastic={0}
-        dragMomentum={false}
-        onDragEnd={handleDragEnd}
-        style={{ x }}
+        {...bind()}
+        style={{ x, touchAction: "pan-y" }}
         className={`z-10 w-16 h-16 rounded-full flex items-center justify-center cursor-pointer shadow-lg active:scale-95 transition-transform ${thumbColor} ${
-          pulse ? 'animate-pulse shadow-[0_0_15px_5px_rgba(220,38,38,0.5)]' : ''
+          pulse && !isSuccess ? 'animate-pulse shadow-[0_0_15px_5px_rgba(220,38,38,0.5)]' : ''
         }`}
       >
         <ChevronRight size={32} className="text-white" />

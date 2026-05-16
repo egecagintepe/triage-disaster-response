@@ -12,10 +12,18 @@ import { useTaskStore } from "../stores/taskStore";
 import { useTeamStore } from "../stores/teamStore";
 import L from "leaflet";
 
+const translatePriority = (p: string) => {
+  if (p === "RED" || p === "CRITICAL" || p === "KRİTİK") return "KRİTİK";
+  if (p === "HIGH" || p === "YÜKSEK") return "YÜKSEK";
+  if (p === "YELLOW" || p === "MEDIUM" || p === "ORTA") return "ORTA";
+  return "DÜŞÜK";
+};
+
 const PRIORITY_COLORS: Record<string, string> = {
-  RED: "text-red-400 bg-red-500/10 border-red-500/20",
-  YELLOW: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  GREEN: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  "KRİTİK": "text-red-500 bg-red-500/10 border-red-500/20",
+  "YÜKSEK": "text-orange-400 bg-orange-500/10 border-orange-500/20",
+  "ORTA": "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  "DÜŞÜK": "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
 };
 
 const MOCK_KANDILLI = [
@@ -94,12 +102,12 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
         initial={false}
         animate={{ x: isCollapsed ? -344 : 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="absolute left-0 top-6 bottom-6 flex items-center z-[1001] pointer-events-none"
+        className="absolute left-0 top-16 bottom-6 flex items-center z-[1001] pointer-events-none"
       >
-        <div className="w-80 h-full ml-6 glass-panel flex flex-col pointer-events-auto border-white/[0.04]">
+        <div className="w-80 h-full ml-6 glass-panel flex flex-col pointer-events-auto border-zinc-800">
 
       {/* SECTION: INTEGRATED TOOLBAR */}
-      <div className="p-3 border-b border-white/[0.06] bg-white/[0.01] flex justify-between items-center gap-2">
+      <div className="p-3 border-b border-zinc-800 bg-black/20 flex justify-between items-center gap-2">
         <div className="flex gap-2">
           {tools.map((tool) => (
             <button
@@ -128,7 +136,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
       {/* CONTEXT SUB-PANEL */}
       {(mode === "PEN" || mode === "OVERRIDE") && (
-        <div className="p-3 border-b border-white/[0.06] bg-black/40">
+        <div className="p-3 border-b border-zinc-800 bg-black/40">
           <div className="flex justify-between items-center mb-2">
             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">KANDİLLİ_CANLI_VERİ</span>
             <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -181,10 +189,10 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
       )}
 
       {/* TAB SWITCHER */}
-      <div className="flex border-b border-white/[0.06]">
+      <div className="flex border-b border-zinc-800">
         <button
           onClick={() => setActiveTab("tasks")}
-          className={`flex-1 py-2 text-[9px] font-bold tracking-[0.15em] uppercase transition-colors ${
+          className={`flex-1 py-2 text-[10px] font-bold tracking-tighter uppercase transition-colors ${
             activeTab === "tasks"
               ? "text-blue-400 border-b-2 border-blue-500 bg-blue-500/5"
               : "text-gray-500 hover:text-gray-300"
@@ -194,7 +202,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
         </button>
         <button
           onClick={() => setActiveTab("fleet")}
-          className={`flex-1 py-2 text-[9px] font-bold tracking-[0.15em] uppercase transition-colors ${
+          className={`flex-1 py-2 text-[10px] font-bold tracking-tighter uppercase transition-colors ${
             activeTab === "fleet"
               ? "text-blue-400 border-b-2 border-blue-500 bg-blue-500/5"
               : "text-gray-500 hover:text-gray-300"
@@ -206,10 +214,10 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
       {/* SECTION: CONTENT */}
       <div className="p-4 flex-1 flex flex-col overflow-hidden">
-        <header className="mb-3 flex items-center justify-between border-b border-white/[0.06] pb-3">
+        <header className="mb-3 flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2">
             <Zap className="h-3 w-3 text-blue-400 fill-blue-400/20" />
-            <h3 className="text-white text-[10px] font-bold tracking-[0.2em] uppercase">
+            <h3 className="text-white text-[11px] font-bold tracking-tighter uppercase">
               {activeTab === "tasks" ? "TASK_QUEUE" : "FLEET_INTELLIGENCE"}
             </h3>
           </div>
@@ -221,11 +229,15 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
         {/* TASK QUEUE TAB */}
         {activeTab === "tasks" && (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-none">
-            {/* Backup requests first (critical) */}
+          <ul className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-none">
+            <AnimatePresence>
             {backupTasks.map((task) => (
-              <div
+              <motion.li
                 key={task.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300 }}
                 onClick={() => handleTaskClick(task)}
                 className="cursor-pointer w-full group relative overflow-hidden p-3 bg-red-500/10 hover:bg-red-500/15 border border-red-500/30 rounded-xl transition-all duration-300 text-left animate-pulse"
               >
@@ -245,13 +257,16 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                     EKİP ATA
                   </button>
                 </div>
-              </div>
+              </motion.li>
             ))}
 
-            {/* Pending tasks */}
             {pendingTasks.map((task) => (
-              <div
+              <motion.li
                 key={task.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300 }}
                 onClick={() => handleTaskClick(task)}
                 className="cursor-pointer w-full group relative overflow-hidden p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-blue-500/30 rounded-xl transition-all duration-300 text-left"
               >
@@ -262,8 +277,8 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                       {task.address || `Konum: ${task.lat.toFixed(4)}, ${task.lng.toFixed(4)}`}
                     </span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter border ${PRIORITY_COLORS[task.priority] || ""}`}>
-                    {task.priority}
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter border ${PRIORITY_COLORS[translatePriority(task.priority)] || ""}`}>
+                    {translatePriority(task.priority)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-2">
@@ -284,13 +299,16 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                     İPTAL
                   </button>
                 </div>
-              </div>
+              </motion.li>
             ))}
 
-            {/* Active tasks */}
             {activeTasks.map((task) => (
-              <div
+              <motion.li
                 key={task.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300 }}
                 onClick={() => handleTaskClick(task)}
                 className="cursor-pointer w-full p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl text-left"
               >
@@ -314,7 +332,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                     TAMAMLANDI
                   </button>
                 </div>
-              </div>
+              </motion.li>
             ))}
 
             {tasks.length === 0 && (
@@ -322,7 +340,8 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                 <p className="text-gray-600 font-mono text-xs animate-pulse tracking-tighter">GÖREV_KUYRUĞU_BOŞ</p>
               </div>
             )}
-          </div>
+            </AnimatePresence>
+          </ul>
         )}
 
         {/* FLEET TAB */}
@@ -380,9 +399,9 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
       </div>
 
       {/* FOOTER: SYSTEM INFRA */}
-      <footer className="p-4 pt-4 border-t border-white/[0.06] flex items-center justify-between bg-black/40 rounded-b-xl">
+      <footer className="p-4 pt-4 border-t border-zinc-800 flex items-center justify-between bg-black/40 rounded-b-xl">
         <div className="flex flex-col gap-1">
-          <span className="text-[8px] font-bold text-gray-600 tracking-[0.1em]">ENCRYPTION_LAYER</span>
+          <span className="text-[9px] font-bold text-gray-600 tracking-tighter">ENCRYPTION_LAYER</span>
           <span className="text-[9px] font-mono text-gray-400 italic">AES_256_GCM_READY</span>
         </div>
         <div className="flex gap-1">
