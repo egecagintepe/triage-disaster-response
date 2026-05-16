@@ -3,21 +3,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
-import { db, Task, seedDatabase } from './lib/db';
+import { useEffect, useState } from 'react';
+import { db, seedDatabase } from './lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import StatusBar from './components/StatusBar';
 import TaskMap from './components/TaskMap';
 import SwipeButton from './components/SwipeButton';
-import { motion, AnimatePresence } from 'motion/react';
+import Login from './pages/Login';
+import { motion } from 'motion/react';
+import type { Task } from './lib/db';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    () => !!localStorage.getItem('auth_token')
+  );
+
   const tasks = useLiveQuery(() => db.tasks.toArray());
   const activeTask = tasks?.find(t => t.status === 'pending' || t.status === 'in_progress');
   
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     seedDatabase();
     
     // Watch geolocation
@@ -31,7 +39,7 @@ export default function App() {
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const handleUpdateStatus = async (status: Task['status']) => {
     if (!activeTask) return;
@@ -65,6 +73,11 @@ export default function App() {
       }, 500);
     }
   };
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="flex flex-col h-screen w-full bg-gray-950 overflow-hidden font-sans">
@@ -120,4 +133,3 @@ export default function App() {
     </div>
   );
 }
-

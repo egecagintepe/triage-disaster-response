@@ -11,9 +11,13 @@
 import { useState, useEffect, useCallback } from "react";
 import MapPanel from "./components/MapPanel";
 import IntelligenceLogPanel from "./components/IntelligenceLogPanel";
+import Login from "./pages/Login";
 import { IntelligenceLog, LogType, FieldUnit, RiskZone, UnitStatus, ZoneType, ToolMode } from "./types";
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    () => !!localStorage.getItem('auth_token')
+  );
   const [toolMode, setToolMode] = useState<ToolMode>("CURSOR");
   const [logs, setLogs] = useState<IntelligenceLog[]>([]);
   const [units] = useState<FieldUnit[]>([
@@ -68,6 +72,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const scenarios = [
       () => addLog("Bornova 3. Sokak", "skoru güncellendi -> KIRMIZI", LogType.AI),
       () => addLog("Ekip x.x.x.4", "hedefe ulaştı.", LogType.ROUTINE),
@@ -85,7 +91,12 @@ export default function App() {
     addLog("Central", "AI_ENGINE_v4_ONLINE", LogType.AI);
 
     return () => clearInterval(interval);
-  }, [addLog]);
+  }, [addLog, isAuthenticated]);
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="relative h-screen w-screen bg-bg-base text-gray-50 overflow-hidden font-sans">
@@ -107,4 +118,3 @@ export default function App() {
     </div>
   );
 }
-

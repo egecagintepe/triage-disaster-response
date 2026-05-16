@@ -1781,13 +1781,13 @@ triage-v2/
 **Çıktı:** Backend API `/docs` üzerinden test edilebilir durumda ✅
 
 #### Sprint 1.2: Frontend Foundation
-- [ ] Vite + React projesi kurulumu
-- [ ] TailwindCSS konfigürasyonu
-- [ ] Dexie.js local database setup
-- [ ] Basic routing (admin vs field app)
-- [ ] Login sayfası
+- [X] Vite + React projesi kurulumu
+- [X] TailwindCSS konfigürasyonu
+- [X] Dexie.js local database setup
+- [X] Basic routing (admin vs field app)
+- [X] Login sayfası
 
-**Çıktı:** Frontend başlatılabilir, login ekranı çalışıyor
+**Çıktı:** Frontend başlatılabilir, login ekranı çalışıyor ✅
 
 ---
 
