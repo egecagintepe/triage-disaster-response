@@ -1,0 +1,55 @@
+/**
+ * TRIAGE V2 — REST API Client (Admin)
+ *
+ * Thin wrapper around fetch() for communicating with the FastAPI backend.
+ * Used by the sync queue to push offline changes.
+ *
+ * The base URL defaults to the LAN master node but can be overridden
+ * via VITE_API_URL environment variable.
+ */
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.1:8000';
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = localStorage.getItem('auth_token');
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`API ${res.status}: ${body}`);
+  }
+
+  // 204 No Content
+  if (res.status === 204) return undefined as unknown as T;
+
+  return res.json();
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>(path),
+
+  post: <T>(path: string, data: unknown) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(data) }),
+
+  patch: <T>(path: string, data: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  delete: <T>(path: string) =>
+    request<T>(path, { method: 'DELETE' }),
+};
+
+/** WebSocket base URL (derived from API URL) */
+export const WS_BASE =
+  import.meta.env.VITE_WS_URL ||
+  API_BASE.replace(/^http/, 'ws');

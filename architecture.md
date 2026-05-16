@@ -1794,13 +1794,13 @@ triage-v2/
 ### PHASE 2: Core Features (Sprint 3-5, 3 hafta)
 
 #### Sprint 2.1: Offline-First Architecture
-- [ ] IndexedDB schema implementation
-- [ ] Sync queue sistemi
-- [ ] WebSocket client integration
-- [ ] Online/offline detection
-- [ ] Basic conflict resolution
+- [X] IndexedDB schema implementation
+- [X] Sync queue sistemi
+- [X] WebSocket client integration
+- [X] Online/offline detection
+- [X] Basic conflict resolution
 
-**Çıktı:** Offline mode çalışıyor, reconnect sonrası sync oluyor
+**Çıktı:** Offline mode çalışıyor, reconnect sonrası sync oluyor ✅
 
 #### Sprint 2.2: Admin Dashboard
 - [ ] Leaflet harita entegrasyonu
