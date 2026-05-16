@@ -1848,22 +1848,22 @@ triage-v2/
 > **Yeni yaklaşım:** Mevcut React+TS komponentlerine state management, offline DB ve WebSocket katmanlarını bağlama.
 
 #### Sprint 4.1: Admin (Komuta) App Wiring
-- [ ] Zustand store entegrasyonu (taskStore, teamStore, syncStore)
-- [ ] REST API client servisi (api.ts)
-- [ ] WebSocket client servisi (websocket.ts)
-- [ ] MapPanel → canlı task/team verisi bağlama
-- [ ] CommandSidePanel → API-driven ekip yönetimi
-- [ ] IntelligenceLogPanel → gerçek sistem event’leri
+- [X] Zustand store entegrasyonu (taskStore, teamStore, syncStore)
+- [X] REST API client servisi (api.ts)
+- [X] WebSocket client servisi (websocket.ts)
+- [X] MapPanel → canlı task/team verisi bağlama
+- [X] CommandSidePanel → API-driven ekip yönetimi
+- [X] IntelligenceLogPanel → gerçek sistem event’leri
 
 #### Sprint 4.2: Field (Saha) App Wiring
-- [ ] Dexie.js offline DB şemasını backend şemasıyla hizalama
-- [ ] Sync queue servisi (syncQueue.ts)
-- [ ] WebSocket client servisi (websocket.ts)
-- [ ] SwipeButton aksiyonları → offline-first task status update
-- [ ] TaskMap → canlı görev koordinatları
-- [ ] StatusBar → gerçek bağlantı durumu ve sync status
+- [X] Dexie.js offline DB şemasını backend şemasıyla hizalama
+- [X] Sync queue servisi (syncQueue.ts)
+- [X] WebSocket client servisi (websocket.ts)
+- [X] SwipeButton aksiyonları → offline-first task status update
+- [X] TaskMap → canlı görev koordinatları
+- [X] StatusBar → gerçek bağlantı durumu ve sync status
 
-**Çıktı:** Her iki frontend uygulaması backend API’ye bağlı ve offline-first çalışıyor
+**Çıktı:** Her iki frontend uygulaması backend API’ye bağlı ve offline-first çalışıyor ✅
 
 ---
 
@@ -1879,9 +1879,9 @@ triage-v2/
 #### Sprint 5.2: Performance Optimization
 - [ ] Database query optimization
 - [ ] Frontend bundle size reduction
-- [ ] Service Worker caching strategy
+- [X] Service Worker caching strategy
 - [ ] WebSocket message batching
-- [ ] Map tile preloading
+- [X] Map tile preloading
 
 **Çıktı:** Sistem production-ready
 
@@ -1890,10 +1890,10 @@ triage-v2/
 ### PHASE 6: Deployment & Training (Sprint 11, 1 hafta)
 
 #### Sprint 6.1: Deployment (Bare-Metal)
-- [ ] ~~Docker containerization~~ [DEPRECATED]
-- [ ] systemd service dosyaları (triage-backend.service)
-- [ ] Nginx konfigürasyonu (admin + field + API proxy)
-- [ ] Bare-metal deployment script (scripts/deploy.sh)
+- [X] ~~Docker containerization~~ [DEPRECATED]
+- [X] systemd service dosyaları (triage-backend.service)
+- [X] Nginx konfigürasyonu (admin + field + API proxy)
+- [X] Bare-metal deployment script (scripts/setup_server.sh)
 - [ ] WiFi hotspot configuration guide
 - [ ] System monitoring setup
 
