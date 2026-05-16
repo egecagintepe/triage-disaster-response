@@ -57,7 +57,7 @@ export default function IntelligenceLogPanel({ logs }: Props) {
         <span className="text-[9px] font-mono text-emerald-500 animate-pulse">● LIVE</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col-reverse h-full scrollbar-none">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col-reverse gap-4 h-full scrollbar-none">
         {/* LOGS (reverse order) */}
         <ul className="flex flex-col-reverse gap-3 mt-4">
           <AnimatePresence initial={false}>

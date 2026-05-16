@@ -1,7 +1,6 @@
-import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import OfflineTileLayer from './OfflineTileLayer';
 
 const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   RED:    { bg: 'bg-red-500/20',    text: 'text-red-500',     label: 'YÜKSEK' },
@@ -16,18 +15,16 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string 
 // Fix for default marker icon in Leaflet + Vite
 const customIcon = L.divIcon({
   className: 'bg-transparent',
-  html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
-  iconSize: [16, 16],
-  iconAnchor: [8, 8]
+  html: `<div class="w-3 h-3 bg-red-500 rounded-full border border-black shadow-lg shadow-red-500"></div>`,
+  iconSize: [12, 12],
+  iconAnchor: [6, 6]
 });
 
 const userIcon = L.divIcon({
   className: 'bg-transparent',
-  html: `<div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); position: relative;">
-          <div style="position: absolute; width: 32px; height: 32px; background: rgba(59, 130, 246, 0.3); border-radius: 50%; top: -8px; left: -8px; animation: pulse 2s infinite;"></div>
-         </div>`,
-  iconSize: [16, 16],
-  iconAnchor: [8, 8]
+  html: `<div class="w-3 h-3 bg-blue-500 rounded-full border border-black shadow-lg shadow-blue-500"></div>`,
+  iconSize: [12, 12],
+  iconAnchor: [6, 6]
 });
 
 // Helper component to center map on coordinates
@@ -73,10 +70,9 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
         scrollWheelZoom={true}
         preferCanvas={true}
       >
-        <OfflineTileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="map-tiles-dark"
-          attribution='&copy; <a href="https://openstreetmap.org/">OSM</a>'
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; CARTO'
         />
         <Marker position={[taskLat, taskLng]} icon={customIcon}>
           <Popup>{address}</Popup>

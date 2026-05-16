@@ -4,8 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, Marker, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON } from "react-leaflet";
-import MarkerClusterGroup from "react-leaflet-cluster";
+import { MapContainer, Marker, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode, LogType } from "../types";
@@ -15,7 +14,6 @@ import { useZoneStore } from "../stores/zoneStore";
 import { api } from "../services/api";
 import CommandSidePanel from "./CommandSidePanel";
 import OfflineTileLayer from "./OfflineTileLayer";
-import HeatmapLayer from "./HeatmapLayer";
 
 const translatePriority = (p: string) => {
   if (p === "RED" || p === "CRITICAL" || p === "KRİTİK") return "KRİTİK";
@@ -34,44 +32,27 @@ function MouseTracker() {
   return null;
 }
 
-const createUnitIcon = (status: UnitStatus) => {
-  let color = "#10B981"; // success
-  if (status === UnitStatus.BUSY) color = "#EF4444";
-  if (status === UnitStatus.OFFLINE) color = "#9CA3AF";
+const createMarkerIcon = (colorClass: string) => new L.DivIcon({
+  className: 'bg-transparent',
+  html: `<div class="w-3 h-3 ${colorClass} rounded-full border border-black shadow-lg shadow-${colorClass}"></div>`,
+  iconSize: [12, 12],
+  iconAnchor: [6, 6]
+});
 
-  return L.divIcon({
-    className: "bg-transparent",
-    html: `
-      <div class="relative flex items-center justify-center">
-        ${status !== UnitStatus.OFFLINE ? `<div class="absolute w-8 h-8 rounded-full bg-[${color}] opacity-30" style="background-color: ${color}; animation: radar-ping 2s infinite;"></div>` : ""}
-        <div class="relative w-3.5 h-3.5 rounded-full border border-white/40 shadow-lg" style="background-color: ${color}; ${status === UnitStatus.OFFLINE ? "border: 2px solid #F59E0B; box-shadow: 0 0 10px #F59E0B;" : ""}"></div>
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-  });
+const createUnitIcon = (status: UnitStatus) => {
+  let colorClass = "bg-blue-500";
+  if (status === UnitStatus.BUSY) colorClass = "bg-red-500";
+  if (status === UnitStatus.OFFLINE) colorClass = "bg-gray-400";
+  return createMarkerIcon(colorClass);
 };
 
 const createTaskIcon = (rawPriority: string, status: string) => {
   const p = translatePriority(rawPriority);
-  const color = p === "KRİTİK" ? "#EF4444"
-              : p === "YÜKSEK" ? "#F97316"
-              : p === "ORTA" ? "#F59E0B"
-              : "#10B981";
-
-  const pulse = status === "pending" || status === "needs_backup";
-
-  return L.divIcon({
-    className: "bg-transparent",
-    html: `
-      <div class="relative flex items-center justify-center">
-        ${pulse ? `<div class="absolute w-6 h-6 rounded-sm opacity-40" style="background-color: ${color}; animation: radar-ping 1.5s infinite; transform: rotate(45deg);"></div>` : ""}
-        <div class="relative w-3 h-3 rounded-sm border border-white/50 shadow-lg" style="background-color: ${color}; transform: rotate(45deg);"></div>
-      </div>
-    `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  });
+  let colorClass = "bg-emerald-500";
+  if (p === "KRİTİK") colorClass = "bg-red-500";
+  else if (p === "YÜKSEK") colorClass = "bg-orange-500";
+  else if (p === "ORTA") colorClass = "bg-amber-500";
+  return createMarkerIcon(colorClass);
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -175,20 +156,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
     }
   };
 
-  const heatmapPoints: [number, number, number][] = [
-    ...tasks.filter(t => t.status !== "resolved").map((t): [number, number, number] => {
-      const weight = t.priority === "KRİTİK" || t.priority === "CRITICAL" || t.priority === "RED" ? 1.0 :
-                     t.priority === "YÜKSEK" || t.priority === "HIGH" ? 0.8 :
-                     t.priority === "ORTA" || t.priority === "YELLOW" || t.priority === "MEDIUM" ? 0.6 : 0.4;
-      return [t.lat, t.lng, weight];
-    }),
-    ...riskZones.map((z): [number, number, number] => {
-      if (!z.points || z.points.length === 0) return [0, 0, 0];
-      const poly = L.polygon(z.points as L.LatLngTuple[]);
-      const center = poly.getBounds().getCenter();
-      return [center.lat, center.lng, (z.score || 50) / 100];
-    }).filter(p => p[0] !== 0)
-  ];
+
 
   return (
     <div className="absolute inset-0 z-0 bg-black">
@@ -206,13 +174,10 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         ref={setMap}
       >
         <MouseTracker />
-        <OfflineTileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="map-tiles-dark"
-          attribution='&copy; OpenStreetMap'
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; CARTO'
         />
-
-        <HeatmapLayer points={heatmapPoints} />
 
         {faultLines && (
           <GeoJSON 
@@ -293,7 +258,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         })}
 
         {/* Marker Clusters */}
-        <MarkerClusterGroup chunkedLoading maxClusterRadius={40}>
+        <>
           {/* Task Markers — diamond-shaped, color = priority */}
           {tasks.filter(t => t && t.status !== "resolved" && t.status !== "false_alarm" && !isNaN(t.lat) && !isNaN(t.lng)).map((task, idx) => (
             <Marker
@@ -351,7 +316,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
               </Marker>
             </div>
           ))}
-        </MarkerClusterGroup>
+        </>
       </MapContainer>
       
       {/* HUD & Panels - Siblings of MapContainer to ensure top-layer render */}
