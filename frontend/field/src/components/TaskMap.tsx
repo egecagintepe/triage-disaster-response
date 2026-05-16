@@ -64,12 +64,13 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
       <MapContainer 
         center={[taskLat, taskLng]} 
         zoom={15} 
+        minZoom={5}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
         dragging={true}
         touchZoom={true}
         doubleClickZoom={true}
-        scrollWheelZoom={false}
+        scrollWheelZoom={true}
       >
         <OfflineTileLayer
           attribution='&copy; OpenStreetMap'

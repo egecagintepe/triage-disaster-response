@@ -254,6 +254,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
       <MapContainer
         center={position}
         zoom={13}
+        minZoom={2}
         className="h-full w-full z-0"
         zoomControl={false}
         attributionControl={false}
