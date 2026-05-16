@@ -10,6 +10,7 @@ import type { Task } from "../services/localDb";
 import { useTaskStore } from "../stores/taskStore";
 import { useTeamStore } from "../stores/teamStore";
 import L from "leaflet";
+import "leaflet-draw";
 
 const PRIORITY_COLORS: Record<string, string> = {
   RED: "text-red-400 bg-red-500/10 border-red-500/20",
@@ -114,9 +115,14 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
         <div className="p-3 border-b border-white/10 bg-blue-500/10 flex gap-2">
           <button
             onClick={() => {
-              if (map) {
-                // @ts-ignore
-                new L.Draw.Polygon(map).enable();
+              if (map && (window as any).L && (window as any).L.Draw) {
+                try {
+                  new (window as any).L.Draw.Polygon(map).enable();
+                } catch (err) {
+                  console.error("Leaflet Draw Error:", err);
+                }
+              } else {
+                console.error("Map or L.Draw is not initialized.");
               }
             }}
             className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-2 rounded transition-colors"
