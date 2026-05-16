@@ -297,6 +297,10 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
                   shapeOptions: { color: "#3B82F6" }
                 }
               }}
+              edit={{
+                edit: false,
+                remove: false
+              }}
             />
           </FeatureGroup>
         )}

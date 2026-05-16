@@ -73,8 +73,8 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
         scrollWheelZoom={true}
       >
         <OfflineTileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
         />
         <Marker position={[taskLat, taskLng]} icon={customIcon}>
           <Popup>{address}</Popup>

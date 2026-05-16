@@ -221,10 +221,10 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
     if (isOnline) {
-      toast.success("BAĞLANTI KURULDU", { id: "network-status" });
+      toast.success("BAĞLANTI KURULDU", { id: "network-status", duration: 4000 });
       addLog("NETWORK", "BAĞLANTI_KURULDU", LogType.SYSTEM);
     } else {
-      toast.error("BAĞLANTI KESİLDİ — ÇEVRİMDIŞI MOD", { id: "network-status", duration: Infinity });
+      toast.error("BAĞLANTI KESİLDİ — ÇEVRİMDIŞI MOD", { id: "network-status" });
       addLog("NETWORK", "BAĞLANTI_KESİLDİ — ÇEVRİMDIŞI_MOD", LogType.CRITICAL);
     }
 
@@ -258,7 +258,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="relative h-screen w-screen bg-black text-gray-50 overflow-hidden font-sans">
-        <Toaster theme="dark" position="bottom-right" richColors />
+        <Toaster duration={4000} theme="dark" position="bottom-right" richColors />
         <OpsHeader
           isOnline={isOnline}
           teamCount={storeTeams.length}

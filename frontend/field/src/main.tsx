@@ -4,7 +4,7 @@ import {registerSW} from 'virtual:pwa-register';
 import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
-
+import 'leaflet/dist/leaflet.css';
 // Install the PWA service worker for true offline capability.
 // The SW caches all static assets + map tiles via Workbox rules
 // configured in vite.config.ts. Without this call, offline mode breaks.
