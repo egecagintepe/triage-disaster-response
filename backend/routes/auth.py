@@ -125,3 +125,24 @@ async def heartbeat(payload: HeartbeatRequest, db: AsyncSession = Depends(get_db
         status="ok",
         new_tasks_count=len(new_tasks),
     )
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+async def refresh_token(device: dict = Depends(require_auth)):
+    """Refresh a valid JWT token.
+
+    Accepts a still-valid Bearer token and issues a new one with a fresh
+    expiration window. Used by the frontend 401 interceptor to silently
+    rotate tokens before they expire.
+    """
+    new_token = create_access_token({
+        "sub": device["device_id"],
+        "role": device["role"],
+        "device_name": device.get("device_name", ""),
+    })
+    return RefreshResponse(access_token=new_token)

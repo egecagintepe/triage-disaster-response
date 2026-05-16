@@ -1,8 +1,15 @@
 """Pydantic schemas for Team API validation."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+import re
 from typing import Optional
 from datetime import datetime
+
+# Blocks common SQL/XSS injection patterns in free-text fields
+_INJECTION_RE = re.compile(
+    r"(--|;|<script|</script|DROP\s+TABLE|INSERT\s+INTO|SELECT\s+.+\s+FROM|UNION\s+SELECT|xp_)",
+    re.IGNORECASE,
+)
 
 
 class TeamCreate(BaseModel):
@@ -12,6 +19,13 @@ class TeamCreate(BaseModel):
     status: str = Field(default="offline", pattern=r"^(offline|idle|busy)$")
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def block_injection(cls, v: Optional[str]) -> Optional[str]:
+        if v and _INJECTION_RE.search(v):
+            raise ValueError('Input contains blocked characters or patterns')
+        return v
 
 
 class TeamUpdate(BaseModel):

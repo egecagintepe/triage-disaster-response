@@ -10,9 +10,12 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.1:8000';
 
+let isRefreshing = false;
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
+  _isRetry = false,
 ): Promise<T> {
   const token = localStorage.getItem('auth_token');
 
@@ -24,6 +27,32 @@ async function request<T>(
       ...options.headers,
     },
   });
+
+  // 401 Interceptor: attempt silent token refresh + retry once
+  if (res.status === 401 && !_isRetry && token && !isRefreshing) {
+    isRefreshing = true;
+    try {
+      const refreshRes = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (refreshRes.ok) {
+        const { access_token } = await refreshRes.json();
+        localStorage.setItem('auth_token', access_token);
+        console.log('[API] Token refreshed successfully');
+        return request<T>(path, options, true);
+      }
+    } catch (e) {
+      console.error('[API] Token refresh failed:', e);
+    } finally {
+      isRefreshing = false;
+    }
+    // Refresh failed — clear token
+    localStorage.removeItem('auth_token');
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
