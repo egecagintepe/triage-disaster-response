@@ -1,6 +1,7 @@
 """SQLAlchemy async database setup for SQLite."""
 
 import os
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
@@ -14,6 +15,17 @@ engine = create_async_engine(
     echo=False,
     connect_args={"check_same_thread": False},
 )
+
+
+# SQLite performance pragmas for high-concurrency offline sync writes
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
+    cursor.execute("PRAGMA cache_size=-64000;")  # 64MB cache
+    cursor.close()
+
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

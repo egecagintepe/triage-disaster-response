@@ -1,10 +1,14 @@
-"""AFAD/Kandilli earthquake data client.
+"""Earthquake data client — live Kandilli Observatory + simulated impact zones.
 
-Fetches earthquake data from Turkish disaster APIs.
-Includes mock data for offline/testing scenarios.
+Flow:
+1. fetch_latest_earthquake() → async GET to Kandilli community API
+2. Real data: magnitude, depth, coordinates, location from live API
+3. Simulated: affected_regions generated around real epicenter (30km radius)
+4. Fallback: MOCK_EARTHQUAKE if API unreachable
 """
 
-import json
+import math
+import random
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -12,17 +16,99 @@ import httpx
 
 from config import AFAD_API_URL
 
+# Kandilli community API (live earthquake data)
+KANDILLI_API_URL = "https://api.orhanaydogdu.com.tr/deprem/kandilli/live"
 
-# --- Mock Data (realistic İzmir/Bornova severe earthquake scenario) ---
+
+# --- Simulated Impact Zone Generator ---
+
+# Realistic Turkish district names for impact zones relative to epicenter
+_DISTRICT_TEMPLATES = [
+    ("Merkez", 0.0, 0.0),
+    ("Kuzey Bölge", 0.04, 0.01),
+    ("Güney Bölge", -0.04, -0.01),
+    ("Doğu Bölge", 0.01, 0.04),
+    ("Batı Bölge", 0.01, -0.04),
+]
+
+
+def _generate_affected_regions(
+    epicenter_lat: float,
+    epicenter_lng: float,
+    magnitude: float,
+    location_name: str,
+    closest_cities: list,
+) -> list:
+    """Generate simulated affected_regions around a real epicenter.
+
+    Uses closest city data from Kandilli API when available.
+    Falls back to template-based generation otherwise.
+    """
+    regions = []
+
+    if closest_cities and len(closest_cities) >= 3:
+        # Use real city data from Kandilli API
+        for i, city in enumerate(closest_cities[:5]):
+            distance_km = city.get("distance", 0) / 1000  # API gives meters
+            population = city.get("population", 100000) or 100000
+            name = city.get("name", f"Bölge {i+1}")
+
+            # Estimate building and risk data from magnitude + distance
+            pop_density = int(population / max(distance_km, 1) * 0.5)
+            pop_density = min(pop_density, 20000)  # Cap at realistic max
+            old_ratio = max(0.15, min(0.7, 0.6 - distance_km * 0.01))
+
+            # Calculate lat/lng from epicenter + bearing
+            angle = (i * 72) * math.pi / 180  # Spread evenly
+            offset_lat = math.sin(angle) * distance_km * 0.009
+            offset_lng = math.cos(angle) * distance_km * 0.009
+
+            regions.append({
+                "name": name,
+                "lat": round(epicenter_lat + offset_lat, 4),
+                "lng": round(epicenter_lng + offset_lng, 4),
+                "population": population,
+                "building_count": int(population * 0.12),
+                "old_building_ratio": round(old_ratio, 2),
+                "distance_to_epicenter_km": round(distance_km, 1),
+                "population_density": pop_density,
+                "soil_type": random.choice(["soft", "medium", "hard"]),
+            })
+    else:
+        # Template fallback — generate zones around epicenter
+        impact_radius_km = min(magnitude * 5, 30)
+
+        for i, (suffix, dlat, dlng) in enumerate(_DISTRICT_TEMPLATES):
+            distance_km = math.sqrt(dlat**2 + dlng**2) * 111  # rough deg→km
+            if i == 0:
+                distance_km = 0.5  # Merkez
+
+            scale = max(0.3, 1.0 - distance_km / impact_radius_km)
+            pop_density = int(8000 * scale + random.randint(1000, 5000))
+            old_ratio = round(max(0.15, 0.55 * scale + random.uniform(0, 0.1)), 2)
+
+            regions.append({
+                "name": f"{location_name} {suffix}",
+                "lat": round(epicenter_lat + dlat, 4),
+                "lng": round(epicenter_lng + dlng, 4),
+                "population": int(pop_density * random.randint(20, 40)),
+                "building_count": int(pop_density * random.randint(3, 6)),
+                "old_building_ratio": old_ratio,
+                "distance_to_epicenter_km": round(distance_km, 1),
+                "population_density": pop_density,
+                "soil_type": random.choice(["soft", "medium", "hard"]),
+            })
+
+    return regions
+
+
+# --- Mock Data (fallback when API unreachable) ---
 
 MOCK_EARTHQUAKE = {
     "earthquake_id": "MOCK-2024-001",
     "magnitude": 6.8,
     "depth_km": 12.0,
-    "epicenter": {
-        "lat": 38.4192,
-        "lng": 27.1287,
-    },
+    "epicenter": {"lat": 38.4192, "lng": 27.1287},
     "lat": 38.4192,
     "lng": 27.1287,
     "location": "İzmir, Bornova",
@@ -30,59 +116,34 @@ MOCK_EARTHQUAKE = {
     "source": "MOCK",
     "affected_regions": [
         {
-            "name": "Bayraklı",
-            "lat": 38.4535,
-            "lng": 27.1597,
-            "population": 315000,
-            "building_count": 42000,
-            "old_building_ratio": 0.62,
-            "distance_to_epicenter_km": 3.1,
-            "population_density": 15000,
-            "soil_type": "soft",
+            "name": "Bayraklı", "lat": 38.4535, "lng": 27.1597,
+            "population": 315000, "building_count": 42000,
+            "old_building_ratio": 0.62, "distance_to_epicenter_km": 3.1,
+            "population_density": 15000, "soil_type": "soft",
         },
         {
-            "name": "Konak",
-            "lat": 38.4189,
-            "lng": 27.1287,
-            "population": 390000,
-            "building_count": 55000,
-            "old_building_ratio": 0.55,
-            "distance_to_epicenter_km": 1.5,
-            "population_density": 11200,
-            "soil_type": "medium",
+            "name": "Konak", "lat": 38.4189, "lng": 27.1287,
+            "population": 390000, "building_count": 55000,
+            "old_building_ratio": 0.55, "distance_to_epicenter_km": 1.5,
+            "population_density": 11200, "soil_type": "medium",
         },
         {
-            "name": "Bornova Merkez",
-            "lat": 38.4622,
-            "lng": 27.2176,
-            "population": 450000,
-            "building_count": 85000,
-            "old_building_ratio": 0.45,
-            "distance_to_epicenter_km": 5.2,
-            "population_density": 12500,
-            "soil_type": "medium",
+            "name": "Bornova Merkez", "lat": 38.4622, "lng": 27.2176,
+            "population": 450000, "building_count": 85000,
+            "old_building_ratio": 0.45, "distance_to_epicenter_km": 5.2,
+            "population_density": 12500, "soil_type": "medium",
         },
         {
-            "name": "Karşıyaka",
-            "lat": 38.4610,
-            "lng": 27.1095,
-            "population": 340000,
-            "building_count": 48000,
-            "old_building_ratio": 0.38,
-            "distance_to_epicenter_km": 8.7,
-            "population_density": 8900,
-            "soil_type": "hard",
+            "name": "Karşıyaka", "lat": 38.4610, "lng": 27.1095,
+            "population": 340000, "building_count": 48000,
+            "old_building_ratio": 0.38, "distance_to_epicenter_km": 8.7,
+            "population_density": 8900, "soil_type": "hard",
         },
         {
-            "name": "Çiğli",
-            "lat": 38.5010,
-            "lng": 27.0590,
-            "population": 210000,
-            "building_count": 32000,
-            "old_building_ratio": 0.22,
-            "distance_to_epicenter_km": 15.3,
-            "population_density": 6200,
-            "soil_type": "hard",
+            "name": "Çiğli", "lat": 38.5010, "lng": 27.0590,
+            "population": 210000, "building_count": 32000,
+            "old_building_ratio": 0.22, "distance_to_epicenter_km": 15.3,
+            "population_density": 6200, "soil_type": "hard",
         },
     ],
 }
@@ -102,64 +163,84 @@ MOCK_ZONES = [
 ]
 
 
+# --- API Functions ---
+
 async def fetch_latest_earthquake() -> dict:
-    """Fetch the latest earthquake data from AFAD API.
+    """Fetch the most recent earthquake from Kandilli Observatory live API.
 
-    Returns realistic mock JSON with:
-    - magnitude, depth, epicenter coordinates
-    - affected_regions with population, building density, soil metadata
+    Real data: magnitude, depth, coordinates, location name, date.
+    Simulated: affected_regions generated around real epicenter using
+               closest city data from the API.
 
-    Falls back to mock data if API unreachable.
+    Falls back to MOCK_EARTHQUAKE if API unreachable.
     """
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            url = f"{AFAD_API_URL}/earthquakes/latest"
-            response = await client.get(url)
+            response = await client.get(KANDILLI_API_URL)
             response.raise_for_status()
             data = response.json()
-            print(f"[AFAD] Fetched earthquake data: M{data.get('magnitude')}")
-            return data
+
+        results = data.get("result", [])
+        if not results:
+            print("[KANDILLI] No earthquake results, using mock")
+            return MOCK_EARTHQUAKE
+
+        # Take the first (most recent) earthquake
+        eq = results[0]
+
+        coords = eq.get("geojson", {}).get("coordinates", [0, 0])
+        lng, lat = coords[0], coords[1]
+        magnitude = eq.get("mag", 0)
+        depth = eq.get("depth", 0)
+        title = eq.get("title", "Bilinmeyen")
+        date_str = eq.get("date_time", "")
+
+        # Extract closest cities for affected_regions generation
+        loc_props = eq.get("location_properties", {})
+        closest_cities = loc_props.get("closestCities", [])
+        epicenter_name = loc_props.get("epiCenter", {}).get("name", title)
+
+        # Build our standard earthquake dict with REAL data
+        location_name = epicenter_name or title
+
+        earthquake = {
+            "earthquake_id": eq.get("earthquake_id", f"KANDILLI-{date_str}"),
+            "magnitude": magnitude,
+            "depth_km": depth,
+            "epicenter": {"lat": lat, "lng": lng},
+            "lat": lat,
+            "lng": lng,
+            "location": location_name,
+            "date": date_str,
+            "source": "KANDILLI_LIVE",
+            "affected_regions": _generate_affected_regions(
+                lat, lng, magnitude, location_name, closest_cities,
+            ),
+        }
+
+        print(
+            f"[KANDILLI] Live earthquake: M{magnitude} {location_name} "
+            f"({lat:.4f}, {lng:.4f}) depth={depth}km"
+        )
+        return earthquake
+
     except Exception as e:
-        print(f"[AFAD] API unreachable ({e}), using mock data")
+        print(f"[KANDILLI] API error ({e}), using mock data")
         return MOCK_EARTHQUAKE
 
 
 async def fetch_earthquake_data(earthquake_id: Optional[str] = None) -> dict:
-    """Fetch earthquake data from AFAD API.
-
-    Falls back to mock data if API is unreachable.
-    """
-    if earthquake_id is None:
-        return await fetch_latest_earthquake()
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            url = f"{AFAD_API_URL}/earthquakes/{earthquake_id}"
-            response = await client.get(url)
-            response.raise_for_status()
-            data = response.json()
-            print(f"[AFAD] Fetched earthquake data: M{data.get('magnitude')}")
-            return data
-    except Exception as e:
-        print(f"[AFAD] API unreachable ({e}), using mock data")
-        return MOCK_EARTHQUAKE
+    """Fetch earthquake data. Delegates to fetch_latest_earthquake."""
+    return await fetch_latest_earthquake()
 
 
 async def fetch_zone_data() -> list[dict]:
-    """Fetch regional zone data.
-
-    In production, this would come from GIS databases or AFAD's zone API.
-    For now, returns mock data representing İzmir districts.
-    """
+    """Fetch regional zone data (mock for backward compat)."""
     return MOCK_ZONES
 
 
 def generate_seed_data() -> dict:
-    """Generate a complete seed dataset for development/demo.
-
-    Returns:
-        Dict with 'earthquake', 'zones', and 'tasks' keys.
-    """
+    """Generate a complete seed dataset for development/demo."""
     from services.ai_engine import calculate_priority_score_fallback, classify_priority
 
     earthquake = MOCK_EARTHQUAKE.copy()
@@ -192,7 +273,6 @@ def generate_seed_data() -> dict:
         }
         zones_with_scores.append(zone_record)
 
-        # Generate tasks per zone based on priority
         task_count = {5.0: 8, 4.0: 6, 3.0: 4, 2.0: 2, 1.0: 1}.get(
             round(score), 3
         )

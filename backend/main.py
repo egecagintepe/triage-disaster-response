@@ -4,6 +4,7 @@ import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from config import CORS_ORIGINS
 from database import init_db, async_session
@@ -46,6 +47,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# GZip compression for large sync payloads
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Register routers
 app.include_router(auth_router)
