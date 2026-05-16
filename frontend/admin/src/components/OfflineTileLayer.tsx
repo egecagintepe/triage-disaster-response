@@ -6,9 +6,10 @@ import "leaflet.offline";
 interface Props {
   url: string;
   attribution: string;
+  className?: string;
 }
 
-export default function OfflineTileLayer({ url, attribution }: Props) {
+export default function OfflineTileLayer({ url, attribution, className }: Props) {
   const map = useMap();
 
   useEffect(() => {
@@ -16,9 +17,10 @@ export default function OfflineTileLayer({ url, attribution }: Props) {
     const tileLayerOffline = L.tileLayer.offline(url, {
       attribution,
       subdomains: "abc",
-      minZoom: 13,
+      minZoom: 2,
       maxZoom: 19,
       crossOrigin: true,
+      className,
     });
 
     tileLayerOffline.addTo(map);

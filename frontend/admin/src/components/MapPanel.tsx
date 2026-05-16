@@ -4,12 +4,10 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, Marker, Tooltip, Polygon, Polyline, CircleMarker, FeatureGroup, useMapEvents, GeoJSON } from "react-leaflet";
+import { MapContainer, Marker, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
-import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet-draw/dist/leaflet.draw.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode, LogType } from "../types";
 import type { Task } from "../services/localDb";
 import { db } from "../services/localDb";
@@ -42,7 +40,7 @@ const createUnitIcon = (status: UnitStatus) => {
   if (status === UnitStatus.OFFLINE) color = "#9CA3AF";
 
   return L.divIcon({
-    className: "custom-div-icon",
+    className: "bg-transparent",
     html: `
       <div class="relative flex items-center justify-center">
         ${status !== UnitStatus.OFFLINE ? `<div class="absolute w-8 h-8 rounded-full bg-[${color}] opacity-30" style="background-color: ${color}; animation: radar-ping 2s infinite;"></div>` : ""}
@@ -64,7 +62,7 @@ const createTaskIcon = (rawPriority: string, status: string) => {
   const pulse = status === "pending" || status === "needs_backup";
 
   return L.divIcon({
-    className: "custom-div-icon",
+    className: "bg-transparent",
     html: `
       <div class="relative flex items-center justify-center">
         ${pulse ? `<div class="absolute w-6 h-6 rounded-sm opacity-40" style="background-color: ${color}; animation: radar-ping 1.5s infinite; transform: rotate(45deg);"></div>` : ""}
@@ -131,76 +129,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
       .catch(console.error);
   }, []);
 
-  // Restore the programmatic drawing listener
-  useEffect(() => {
-    if (!map) return;
-    
-    // Explicitly rebind the drawing persistence pipeline
-    const handleDrawCreated = async (e: any) => {
-      const { layerType, layer } = e;
-      if (layerType === 'polygon') {
-        const latlngs = layer.getLatLngs()[0];
-        const coordinates = [latlngs.map((ll: any) => [ll.lng, ll.lat])];
-        // Close the polygon
-        coordinates[0].push([latlngs[0].lng, latlngs[0].lat]);
-        
-        const geojson = {
-          type: "Polygon",
-          coordinates
-        };
-
-        // Add layer to map visually so it doesn't disappear immediately
-        map.addLayer(layer);
-
-        const tempId = `temp-${Date.now()}`;
-        const newZonePoints = coordinates[0].map((c: any) => [c[1], c[0]] as [number, number]);
-        useZoneStore.getState().addZone({
-          id: tempId,
-          type: ZoneType.MEDIUM,
-          score: 70,
-          points: newZonePoints
-        });
-
-        try {
-          const res = await api.post('/api/v1/zones', {
-            name: `Bölge ${Math.floor(Math.random() * 1000)}`,
-            priority_score: 3.5, 
-            geometry: geojson
-          });
-          
-          if (res && res.id) {
-            useZoneStore.getState().updateZone({
-              id: String(res.id),
-              type: ZoneType.MEDIUM,
-              score: 70,
-              points: newZonePoints
-            });
-            useZoneStore.getState().deleteZone(tempId);
-          }
-          
-          // Log manual override
-          window.dispatchEvent(new CustomEvent('map_action_log', { 
-            detail: { action: "Yeni Risk Bölgesi İşaretlendi", entity: "[MANUAL_OVERRIDE]", type: LogType.SYSTEM } 
-          }));
-          
-          // Remove manual layer, let WebSocket/Zustand update trigger React render
-          map.removeLayer(layer);
-        } catch (err) {
-          console.error("Bölge oluşturulamadı:", err);
-          map.removeLayer(layer); // remove if failed
-          useZoneStore.getState().deleteZone(tempId);
-        }
-        
-        setToolMode("CURSOR");
-      }
-    };
-
-    map.on(L.Draw.Event.CREATED, handleDrawCreated);
-
-    return () => {
-      map.off(L.Draw.Event.CREATED, handleDrawCreated);
-    };
-  }, [map, setToolMode]);
+  // Removed leaflet-draw programmatic drawing listener per user request
 
   // Priority Toggle
   const handleZoneClick = async (zone: RiskZone) => {
@@ -278,8 +207,9 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
       >
         <MouseTracker />
         <OfflineTileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap &copy; CARTO'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className="map-tiles-dark"
+          attribution='&copy; OpenStreetMap'
         />
 
         <HeatmapLayer points={heatmapPoints} />
@@ -299,31 +229,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           </defs>
         </svg>
 
-        {/* Draw Controls */}
-        {toolMode === "PEN" && (
-          <FeatureGroup>
-            <EditControl
-              position="topright"
-              onCreated={() => {/* Handled by useEffect map.on(L.Draw.Event.CREATED) */}}
-              draw={{
-                rectangle: false,
-                circle: false,
-                circlemarker: false,
-                marker: false,
-                polyline: false,
-                polygon: {
-                  allowIntersection: false,
-                  drawError: { color: "#e1e100", message: "Kesişim olamaz!" },
-                  shapeOptions: { color: "#3B82F6" }
-                }
-              }}
-              edit={{
-                edit: false,
-                remove: false
-              }}
-            />
-          </FeatureGroup>
-        )}
+        {/* Draw Controls Removed */}
         
         {/* Risk Zones */}
         {riskZones.filter(z => z && z.points && z.points.length > 0 && z.points.every(p => p && p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]))).map((zone) => {
@@ -389,9 +295,9 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         {/* Marker Clusters */}
         <MarkerClusterGroup chunkedLoading maxClusterRadius={40}>
           {/* Task Markers — diamond-shaped, color = priority */}
-          {tasks.filter(t => t && t.status !== "resolved" && t.status !== "false_alarm" && !isNaN(t.lat) && !isNaN(t.lng)).map((task) => (
+          {tasks.filter(t => t && t.status !== "resolved" && t.status !== "false_alarm" && !isNaN(t.lat) && !isNaN(t.lng)).map((task, idx) => (
             <Marker
-              key={`task-${task.id}`}
+              key={`task-${task.id}-${idx}`}
               position={[task.lat, task.lng]}
               icon={createTaskIcon(task.priority, task.status)}
               eventHandlers={{

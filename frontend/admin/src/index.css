@@ -38,6 +38,11 @@
   }
 }
 
+/* Phase 7: Dark OSM Tiles via CSS */
+.map-tiles-dark {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
 /* Custom hatching for No-Go Zones */
 .no-go-pattern {
   fill: url(#no-go-hatch);
@@ -111,9 +116,20 @@
   }
 }
 
-/* Hide default Leaflet Draw completely */
-.leaflet-draw {
+/* Nuke ALL Leaflet Draw controls — absolute kill */
+.leaflet-draw,
+.leaflet-draw-toolbar,
+.leaflet-draw-section,
+.leaflet-draw-actions,
+[class*='leaflet-draw'] {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Dark tile filter — apply to tile pane directly as fallback */
+.leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
 /* MarkerCluster styling — Cyber-Baroque dark */

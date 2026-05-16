@@ -15,14 +15,14 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string 
 
 // Fix for default marker icon in Leaflet + Vite
 const customIcon = L.divIcon({
-  className: 'custom-div-icon',
+  className: 'bg-transparent',
   html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
   iconSize: [16, 16],
   iconAnchor: [8, 8]
 });
 
 const userIcon = L.divIcon({
-  className: 'user-div-icon',
+  className: 'bg-transparent',
   html: `<div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); position: relative;">
           <div style="position: absolute; width: 32px; height: 32px; background: rgba(59, 130, 246, 0.3); border-radius: 50%; top: -8px; left: -8px; animation: pulse 2s infinite;"></div>
          </div>`,
@@ -74,8 +74,9 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
         preferCanvas={true}
       >
         <OfflineTileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className="map-tiles-dark"
+          attribution='&copy; <a href="https://openstreetmap.org/">OSM</a>'
         />
         <Marker position={[taskLat, taskLng]} icon={customIcon}>
           <Popup>{address}</Popup>

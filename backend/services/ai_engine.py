@@ -86,13 +86,15 @@ def calculate_priority_score_fallback(
 
 
 def classify_priority(score: float) -> str:
-    """Convert a priority score to RED/YELLOW/GREEN classification."""
-    if score >= 3.5:
-        return "RED"
-    elif score >= 2.5:
-        return "YELLOW"
+    """Convert a priority score to KRİTİK/YÜKSEK/ORTA/DÜŞÜK classification."""
+    if score >= 4.0:
+        return "KRİTİK"
+    elif score >= 3.0:
+        return "YÜKSEK"
+    elif score >= 2.0:
+        return "ORTA"
     else:
-        return "GREEN"
+        return "DÜŞÜK"
 
 
 def estimate_team_count(score: float, population: int = 0) -> int:
@@ -270,7 +272,7 @@ BÖLGE VERİLERİ:
 GÖREV:
 Yukarıdaki sismik verilere ve {impact_radius_km} km etki yarıçapına (R = e^(0.8 * M) / depth) dayanarak bir risk analizi yap.
 ÖNEMLİ COĞRAFİ KURAL: 'polygon_coordinates' için asla kare veya düzgün altıgen çizmeyin! Sismik dalga yayılımını ve gerçek coğrafyayı taklit eden, merkez üssü etrafında en az 6-8 noktadan oluşan, asimetrik, eliptik veya organik çokgen koordinatları ([lat, lng] formatında) üretin.
-ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK". İngilizce kelime kullanmayın.
+ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK". İngilizce kelime kullanmayın. YAPAY ZEKA ASLA 'YELLOW' veya 'GREEN' KULLANMAMALIDIR!
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
 1. 'zones' dizisini oluştur: Her bölge için episantr mesafesi ve etki yarıçapını kıyaslayarak risk seviyesi (risk_level), öncelik (priority_score: 1.0-5.0), tahmini kayıp (estimated_casualties) ve merkez koordinatlarını (lat, lng) belirle.
@@ -357,27 +359,27 @@ def offline_rule_based_triage(magnitude: float, depth: float) -> dict:
     Returns basic task generation parameters based on magnitude/depth only.
     """
     if magnitude >= 7.0:
-        priority = "RED"
+        priority = "KRİTİK"
         team_count = 5
         task_types = ["arama_kurtarma", "saglik", "lojistik", "hasar_tespit", "tahliye"]
         confidence = 0.4
     elif magnitude >= 6.0:
-        priority = "RED"
+        priority = "YÜKSEK"
         team_count = 3
         task_types = ["arama_kurtarma", "hasar_tespit", "saglik"]
         confidence = 0.5
     elif magnitude >= 5.0:
-        priority = "YELLOW"
+        priority = "ORTA"
         team_count = 2
         task_types = ["hasar_tespit", "saglik"]
         confidence = 0.6
     elif magnitude >= 4.0:
-        priority = "YELLOW"
+        priority = "DÜŞÜK"
         team_count = 1
         task_types = ["hasar_tespit"]
         confidence = 0.7
     else:
-        priority = "GREEN"
+        priority = "DÜŞÜK"
         team_count = 1
         task_types = ["izleme"]
         confidence = 0.85

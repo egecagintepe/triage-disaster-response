@@ -211,7 +211,7 @@ async def fetch_latest_earthquake() -> dict:
                     "depth": float(geom[2]),
                     "lat": float(geom[1]),
                     "lng": float(geom[0]),
-                    "title": prop.get("place", "Unknown"),
+                    "title": "Bilinmeyen Bölge (USGS)" if any(x in prop.get("place", "Unknown") for x in [" of ", " CA", " km "]) else prop.get("place", "Unknown"),
                     "date": __import__('datetime').datetime.fromtimestamp(prop.get("time", 0)/1000, tz=timezone.utc).isoformat(),
                     "source": "USGS",
                     "closestCities": []
@@ -227,13 +227,25 @@ async def fetch_latest_earthquake() -> dict:
             for f in data:
                 prop = f["properties"]
                 geom = f["geometry"]["coordinates"]
+                
+                raw_region = prop.get("flynn_region", "Unknown")
+                title = "Bilinmeyen Bölge (EMSC)"
+                if "WESTERN TURKEY" in raw_region:
+                    title = "Batı Anadolu (EMSC)"
+                elif "EASTERN TURKEY" in raw_region:
+                    title = "Doğu Anadolu (EMSC)"
+                elif "CENTRAL TURKEY" in raw_region:
+                    title = "İç Anadolu (EMSC)"
+                elif not any(x in raw_region for x in [" OF ", "REGION"]):
+                    title = raw_region
+                    
                 events.append({
                     "id": prop.get("unid"),
                     "mag": float(prop.get("mag", 0.0)),
                     "depth": float(prop.get("depth", 0.0)),
                     "lat": float(geom[1]),
                     "lng": float(geom[0]),
-                    "title": prop.get("flynn_region", "Unknown"),
+                    "title": title,
                     "date": prop.get("time", ""),
                     "source": "EMSC",
                     "closestCities": []
@@ -327,12 +339,22 @@ def generate_seed_data() -> dict:
         )
         priority_class = classify_priority(score)
 
+        # Generate a small polygon around the center for demo
+        r = 0.005 # approx 500m radius
+        polygon_coords = [
+            [zone["lng"], zone["lat"] + r],
+            [zone["lng"] + r, zone["lat"]],
+            [zone["lng"], zone["lat"] - r],
+            [zone["lng"] - r, zone["lat"]],
+            [zone["lng"], zone["lat"] + r] # close polygon
+        ]
+        
         zone_record = {
             "name": zone["name"],
             "priority_score": score,
             "geometry": {
-                "type": "Point",
-                "coordinates": [zone["lng"], zone["lat"]],
+                "type": "Polygon",
+                "coordinates": [polygon_coords],
             },
             "estimated_casualties": int(zone["population_density"] * zone["old_building_ratio"] * 0.01),
             "building_density": int(zone["population_density"] * 0.3),

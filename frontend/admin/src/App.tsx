@@ -54,8 +54,12 @@ function zoneToRiskZone(zone: Zone): RiskZone {
   // Extract points from GeoJSON geometry
   let points: [number, number][] = [];
   const geo = zone.geometry as any;
-  if (geo?.coordinates?.[0]) {
+  if (geo?.type === 'Polygon' && geo?.coordinates?.[0]) {
     points = geo.coordinates[0].map((c: number[]) => [c[1], c[0]] as [number, number]);
+  } else if (geo?.type === 'Point' && Array.isArray(geo?.coordinates)) {
+    // If it's a point, we can just use the center or skip it if we strictly need polygons
+    // For now, let's just use it as a single point to avoid crash
+    points = [[geo.coordinates[1], geo.coordinates[0]]];
   }
 
   return {
