@@ -11,7 +11,7 @@
 import { db } from './localDb';
 import { api } from './api';
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 const AUTO_SYNC_INTERVAL_MS = 30_000; // 30 seconds
 
 class SyncQueue {

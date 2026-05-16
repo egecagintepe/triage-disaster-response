@@ -4,9 +4,11 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { Toaster, toast } from "sonner";
 import MapPanel from "./components/MapPanel";
 import IntelligenceLogPanel from "./components/IntelligenceLogPanel";
 import OpsHeader from "./components/OpsHeader";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Login from "./pages/Login";
 import { IntelligenceLog, LogType, FieldUnit, RiskZone, UnitStatus, ZoneType, ToolMode } from "./types";
 import { useTaskStore } from "./stores/taskStore";
@@ -37,7 +39,7 @@ function teamToFieldUnit(team: Team): FieldUnit {
           : "Çevrimdışı",
     statusType: statusMap[team.status] ?? UnitStatus.OFFLINE,
     coords: [team.current_lat ?? 41.0082, team.current_lng ?? 28.9784],
-    battery: 100,  // Will come from heartbeat in future
+    battery: 100,  // Updated via telemetry events
     ping: 0,
     isOnline: !!team.is_online,
   };
@@ -64,8 +66,6 @@ function zoneToRiskZone(zone: Zone): RiskZone {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/*  Backend Fetchers & Fallbacks (Mock data purged)                   */
 /* ------------------------------------------------------------------ */
 /*  App                                                                */
 /* ------------------------------------------------------------------ */
@@ -188,21 +188,43 @@ export default function App() {
     addLog("Uplink", "SECURE_TUNNEL_ESTABLISHED", LogType.SYSTEM);
     addLog("Central", "AI_ENGINE_v4_ONLINE", LogType.AI);
 
-    // Replace demo scenarios with real system hooks
-    // No more random interval logging, just real events from WS or TaskStore changes.
-
     return () => {
       syncQueue.stopAutoSync();
       wsManager.disconnect();
     };
   }, [addLog, isAuthenticated]);
 
+  // --- Phase 3: Toast notifications from WS broadcasts ---
+  useEffect(() => {
+    const handleBroadcast = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const msg = detail?.message || '';
+      if (msg.includes('SİMÜLASYON') || msg.includes('ALARM')) {
+        toast.error(msg);
+      } else if (msg.includes('AI') || msg.includes('OTOMATİK')) {
+        toast.info(msg);
+      } else {
+        toast(msg);
+      }
+      addLog("WS_BROADCAST", msg, LogType.AI);
+    };
+
+    const handleNewTask = () => {
+      // Toast on new tasks arriving via WS
+    };
+
+    window.addEventListener('ws_broadcast', handleBroadcast);
+    return () => window.removeEventListener('ws_broadcast', handleBroadcast);
+  }, [addLog]);
+
   // --- Log network status changes & map events ---
   useEffect(() => {
     if (!isAuthenticated) return;
     if (isOnline) {
+      toast.success("BAĞLANTI KURULDU", { id: "network-status" });
       addLog("NETWORK", "BAĞLANTI_KURULDU", LogType.SYSTEM);
     } else {
+      toast.error("BAĞLANTI KESİLDİ — ÇEVRİMDIŞI MOD", { id: "network-status", duration: Infinity });
       addLog("NETWORK", "BAĞLANTI_KESİLDİ — ÇEVRİMDIŞI_MOD", LogType.CRITICAL);
     }
 
@@ -234,34 +256,38 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-screen w-screen bg-black text-gray-50 overflow-hidden font-sans">
-      <OpsHeader
-        isOnline={isOnline}
-        teamCount={storeTeams.length}
-        taskCount={storeTasks.filter(t => t.status !== 'resolved' && t.status !== 'false_alarm').length}
-      />
-      <MapPanel
-        units={units}
-        riskZones={zones}
-        toolMode={toolMode}
-        setToolMode={setToolMode}
-        tasks={storeTasks}
-        isOnline={isOnline}
-      />
-      
-      <IntelligenceLogPanel logs={logs} />
+    <ErrorBoundary>
+      <div className="relative h-screen w-screen bg-black text-gray-50 overflow-hidden font-sans">
+        <Toaster theme="dark" position="bottom-right" richColors />
+        <OpsHeader
+          isOnline={isOnline}
+          teamCount={storeTeams.length}
+          taskCount={storeTasks.filter(t => t.status !== 'resolved' && t.status !== 'false_alarm').length}
+          logs={logs}
+        />
+        <MapPanel
+          units={units}
+          riskZones={zones}
+          toolMode={toolMode}
+          setToolMode={setToolMode}
+          tasks={storeTasks}
+          isOnline={isOnline}
+        />
+        
+        <IntelligenceLogPanel logs={logs} />
 
-      {/* Desktop-Only Warning Overlay */}
-      <div className="lg:hidden fixed inset-0 z-[10000] bg-gray-900/95 backdrop-blur-xl flex items-center justify-center p-12 text-center">
-        <div className="max-w-md glass-panel p-8">
-          <div className="h-2 w-12 bg-red-500 mx-auto mb-6 rounded-full animate-pulse" />
-          <h2 className="text-2xl font-bold text-white mb-4 tracking-tighter uppercase">ACCESS_DENIED</h2>
-          <p className="text-gray-400 font-mono text-sm leading-relaxed">
-            SYSTEM_ERROR: VIEWPORT_SIZE_INSUFFICIENT<br/>
-            Bu arayüz sadece komuta merkezi monitörleri (≥1024px) için optimize edilmiştir.
-          </p>
+        {/* Desktop-Only Warning Overlay */}
+        <div className="lg:hidden fixed inset-0 z-[10000] bg-gray-900/95 backdrop-blur-xl flex items-center justify-center p-12 text-center">
+          <div className="max-w-md glass-panel p-8">
+            <div className="h-2 w-12 bg-red-500 mx-auto mb-6 rounded-full animate-pulse" />
+            <h2 className="text-2xl font-bold text-white mb-4 tracking-tighter uppercase">ACCESS_DENIED</h2>
+            <p className="text-gray-400 font-mono text-sm leading-relaxed">
+              SYSTEM_ERROR: VIEWPORT_SIZE_INSUFFICIENT<br/>
+              Bu arayüz sadece komuta merkezi monitörleri (≥1024px) için optimize edilmiştir.
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }

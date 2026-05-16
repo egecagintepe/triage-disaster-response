@@ -169,6 +169,87 @@ from routes.emergency import router as emergency_router
 app.include_router(emergency_router)
 
 
+# ---- PHASE 2: God Mode Debug Injector ----
+from fastapi import Body
+from pydantic import BaseModel
+
+class MockEarthquake(BaseModel):
+    lat: float = 38.4
+    lng: float = 27.1
+    magnitude: float = 6.5
+    depth: float = 10.0
+    city: str = "İzmir (Demo)"
+
+@app.post("/api/debug/inject-earthquake", tags=["debug"])
+async def inject_earthquake(eq: MockEarthquake = Body(...)):
+    """God Mode: Inject a mock earthquake for live demo."""
+    from services.ai_engine import analyze_with_gemini, generate_fallback_analysis
+    from services.task_generator import generate_from_analysis
+    from services.dispatcher import assign_pending_tasks, broadcast_assignments
+
+    mock_data = {
+        "earthquake_id": f"DEMO-{int(__import__('time').time())}",
+        "magnitude": eq.magnitude,
+        "depth": eq.depth,
+        "location": eq.city,
+        "lat": eq.lat,
+        "lng": eq.lng,
+        "affected_regions": [eq.city],
+        "date": __import__('datetime').datetime.now().isoformat(),
+    }
+
+    # AI Analysis (Gemini or fallback)
+    ai_result = await analyze_with_gemini(mock_data, [eq.city])
+    if ai_result and "zones" in ai_result:
+        analysis = ai_result
+        method = "gemini"
+    else:
+        analysis = generate_fallback_analysis(mock_data)
+        method = "fallback"
+
+    # Generate zones + tasks
+    async with async_session() as session:
+        result = await generate_from_analysis(session, analysis, mock_data)
+        assignments = await assign_pending_tasks(session)
+
+    # Broadcast everything
+    await ws_manager.broadcast({
+        "type": "BROADCAST",
+        "message": f"🚨 SİMÜLASYON: M{eq.magnitude} {eq.city} — {result['zones_created']} bölge, {result['tasks_created']} görev ({method})",
+    })
+    for task_data in result.get("tasks", []):
+        await ws_manager.broadcast({"type": "NEW_TASK", "data": task_data})
+    for zone_data in result.get("zones", []):
+        await ws_manager.broadcast({"type": "ZONE_UPDATE", "data": zone_data})
+    if assignments:
+        await broadcast_assignments(assignments)
+
+    return {
+        "status": "injected",
+        "method": method,
+        "zones_created": result["zones_created"],
+        "tasks_created": result["tasks_created"],
+        "auto_assigned": len(assignments) if assignments else 0,
+    }
+
+@app.get("/api/debug/ai-status", tags=["debug"])
+async def ai_status():
+    """Check if Gemini AI engine is reachable."""
+    import os
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        return {"status": "offline", "mode": "deterministic"}
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}")
+            if resp.status_code == 200:
+                return {"status": "online", "mode": "ai"}
+    except Exception:
+        pass
+    return {"status": "offline", "mode": "deterministic"}
+
+
 @app.get("/health", tags=["system"])
 async def health_check():
     """Simple health check endpoint."""
@@ -227,6 +308,27 @@ async def handle_device_message(device_id: str, data: dict):
             "lng": data.get("lng"),
             "timestamp": data.get("timestamp"),
         }, exclude=device_id)
+
+    elif msg_type == "TELEMETRY_UPDATE":
+        # Full telemetry: battery + location
+        await ws_manager.broadcast({
+            "type": "DEVICE_TELEMETRY",
+            "device_id": device_id,
+            "lat": data.get("lat"),
+            "lng": data.get("lng"),
+            "battery": data.get("battery", 1.0),
+            "timestamp": data.get("timestamp"),
+        }, exclude=device_id)
+        # Also update DB
+        async with async_session() as session:
+            from sqlalchemy import select
+            from models.team import Team as TeamModel
+            result = await session.execute(select(TeamModel).where(TeamModel.device_id == device_id))
+            team = result.scalar_one_or_none()
+            if team:
+                team.current_lat = data.get("lat")
+                team.current_lng = data.get("lng")
+                await session.commit()
 
     elif msg_type == "TASK_STATUS_UPDATE":
         # Client is updating a task status

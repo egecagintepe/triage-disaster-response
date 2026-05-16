@@ -69,6 +69,20 @@ class WebSocketManager {
     });
   }
 
+  /**
+   * Send full telemetry (battery + location) to server.
+   */
+  sendTelemetry(lat: number, lng: number, battery: number): void {
+    this.send({
+      type: 'TELEMETRY_UPDATE',
+      device_id: this.deviceId,
+      lat,
+      lng,
+      battery,
+      timestamp: Date.now(),
+    });
+  }
+
   /* ---------------------------------------------------------------- */
   /*  Full sync on reconnection                                        */
   /* ---------------------------------------------------------------- */

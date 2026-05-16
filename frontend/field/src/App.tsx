@@ -69,26 +69,38 @@ export default function App() {
     };
   }, [isAuthenticated, deviceName]);
 
-  // --- Geolocation tracking + WS location reporting ---
+  // Use a ref to track latest location for the interval without re-triggering useEffect
+  const latestLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  
+  // --- Geolocation tracking + Battery + Telemetry ---
   useEffect(() => {
     if (!isAuthenticated) return;
 
     let watchId: number | undefined;
+    let batteryLevel = 1.0;
+
+    try {
+      (navigator as any).getBattery?.().then?.((batt: any) => {
+        batteryLevel = batt.level;
+        batt.addEventListener('levelchange', () => { batteryLevel = batt.level; });
+      });
+    } catch { /* fallback to 100% */ }
 
     if ('geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setUserLocation(loc);
+          setUserLocation(loc); // for UI
+          latestLocationRef.current = loc; // for interval
         },
         (err) => console.error('[Geo] Konum hatası:', err),
         { enableHighAccuracy: true },
       );
 
-      // Send location to server every 10s
       locationIntervalRef.current = setInterval(() => {
-        if (userLocation && wsManager.isConnected) {
-          wsManager.sendLocation(userLocation.lat, userLocation.lng);
+        const loc = latestLocationRef.current;
+        if (loc && wsManager.isConnected) {
+          wsManager.sendTelemetry(loc.lat, loc.lng, batteryLevel);
         }
       }, 10_000);
     }
@@ -97,7 +109,7 @@ export default function App() {
       if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
       if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
     };
-  }, [isAuthenticated, userLocation]);
+  }, [isAuthenticated]);
 
   // --- Poll pending sync count ---
   useEffect(() => {

@@ -161,12 +161,17 @@ class WebSocketManager {
         this.handleDeviceLocation(msg);
         break;
 
+      case 'DEVICE_TELEMETRY':
+        this.handleDeviceTelemetry(msg);
+        break;
+
       case 'TEAM_PRESENCE':
         this.handleTeamPresence(msg.data as Record<string, unknown> || msg);
         break;
 
       case 'BROADCAST':
         console.log(`[WS] Broadcast: ${msg.message}`);
+        window.dispatchEvent(new CustomEvent('ws_broadcast', { detail: msg }));
         break;
 
       case 'ping':
@@ -264,6 +269,23 @@ class WebSocketManager {
     const team = teams.find((t) => t.device_id === deviceId);
     if (team) {
       useTeamStore.getState().setTeamLocation(team.id, lat, lng);
+    }
+  }
+
+  private handleDeviceTelemetry(msg: Record<string, unknown>): void {
+    const deviceId = msg.device_id as string;
+    const lat = msg.lat as number;
+    const lng = msg.lng as number;
+    const battery = msg.battery as number;
+
+    const teams = useTeamStore.getState().teams;
+    const team = teams.find((t) => t.device_id === deviceId);
+    if (team) {
+      useTeamStore.getState().setTeamLocation(team.id, lat, lng);
+      // Dispatch battery event for UI consumption
+      window.dispatchEvent(new CustomEvent('device_battery', {
+        detail: { deviceId, battery: Math.round(battery * 100) }
+      }));
     }
   }
 

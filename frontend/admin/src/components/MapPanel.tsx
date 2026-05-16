@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, Marker, Tooltip, Polygon, Polyline, FeatureGroup, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Tooltip, Polygon, Polyline, CircleMarker, FeatureGroup, useMapEvents } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
@@ -301,7 +301,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         )}
         
         {/* Risk Zones */}
-        {riskZones.map((zone) => {
+        {riskZones.filter(z => z && z.points && z.points.length > 0 && z.points.every(p => p && p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]))).map((zone) => {
           let pathOptions: L.PathOptions = {
             color: zone.type === ZoneType.URGENT ? "#EF4444" : 
                    zone.type === ZoneType.MEDIUM ? "#F59E0B" : 
@@ -314,6 +314,8 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
                          zone.type === ZoneType.MEDIUM ? 0.25 : 0.1,
             weight: zone.type === ZoneType.URGENT ? 3 : 1.5,
             dashArray: zone.type === ZoneType.NO_GO ? "5, 10" : undefined,
+            className: zone.type === ZoneType.URGENT ? "zone-critical" : 
+                       zone.type === ZoneType.MEDIUM ? "zone-high" : undefined,
           };
 
           return (
@@ -336,10 +338,33 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           );
         })}
 
+        {/* Phase 5: Scientific Epicenter CircleMarkers */}
+        {tasks.filter(t => t && t.status !== "resolved" && !isNaN(t.lat) && !isNaN(t.lng)).map((task) => {
+          const prio = task.priority;
+          const isKritik = prio === "RED" || prio === "CRITICAL" || prio === "KRİTİK";
+          const isYuksek = prio === "HIGH" || prio === "YÜKSEK";
+          const radius = isKritik ? 18 : isYuksek ? 14 : 10;
+          const color = isKritik ? "#ef4444" : isYuksek ? "#f97316" : "#f59e0b";
+          return (
+            <CircleMarker
+              key={`epicenter-${task.id}`}
+              center={[task.lat, task.lng]}
+              radius={radius}
+              pathOptions={{
+                color,
+                fillColor: color,
+                fillOpacity: 0.15,
+                weight: 1,
+                dashArray: "4, 4",
+              }}
+            />
+          );
+        })}
+
         {/* Marker Clusters */}
         <MarkerClusterGroup chunkedLoading maxClusterRadius={40}>
           {/* Task Markers — diamond-shaped, color = priority */}
-          {tasks.filter(t => t.status !== "resolved" && t.status !== "false_alarm").map((task) => (
+          {tasks.filter(t => t && t.status !== "resolved" && t.status !== "false_alarm" && !isNaN(t.lat) && !isNaN(t.lng)).map((task) => (
             <Marker
               key={`task-${task.id}`}
               position={[task.lat, task.lng]}
@@ -370,7 +395,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           ))}
 
           {/* Unit Markers + destination lines */}
-          {units.map((unit) => (
+          {units.filter(u => u && u.coords && u.coords.length === 2 && !isNaN(u.coords[0]) && !isNaN(u.coords[1])).map((unit) => (
             <div key={unit.id}>
               {unit.destination && unit.statusType === UnitStatus.BUSY && (
                 <Polyline 

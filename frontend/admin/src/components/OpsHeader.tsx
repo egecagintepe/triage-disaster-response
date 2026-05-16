@@ -1,20 +1,26 @@
 /**
  * TRIAGE V2 — Telemetry Ops Header
- * Shows: Operation Uptime, Active Teams, Sync Queue, KIRMIZI ALARM button, QR Code
+ * Phase 2: Simulation inject button
+ * Phase 4: AI status badge
+ * Phase 6: AAR export + Auto-dispatch
  */
 
 import { useState, useEffect } from "react";
-import { AlertTriangle, QrCode, Clock, Users, Radio, X } from "lucide-react";
+import { AlertTriangle, QrCode, Clock, Users, Radio, X, Brain, Download, Zap } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { api } from "../services/api";
+import { toast } from "sonner";
+import { useTaskStore } from "../stores/taskStore";
+import { useTeamStore } from "../stores/teamStore";
 
 interface Props {
   isOnline: boolean;
   teamCount: number;
   taskCount: number;
+  logs?: { time: string; entity: string; action: string }[];
 }
 
-export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
+export default function OpsHeader({ isOnline, teamCount, taskCount, logs = [] }: Props) {
   const [uptime, setUptime] = useState("00:00:00");
   const [showQR, setShowQR] = useState(false);
   const [qrData, setQrData] = useState<{ qr_base64?: string | null; url?: string; ip?: string } | null>(null);
@@ -23,6 +29,10 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
   const [alertMessage, setAlertMessage] = useState("KIRMIZI ALARM — TÜM EKİPLER DİKKAT!");
   const [startTime] = useState(() => Date.now());
   const dynamicUrl = `${window.location.protocol}//${window.location.hostname}:3001`;
+
+  // Phase 4: AI Status
+  const [aiStatus, setAiStatus] = useState<"online" | "offline" | "checking">("checking");
+  const [simLoading, setSimLoading] = useState(false);
 
   // Ops Clock tick
   useEffect(() => {
@@ -36,6 +46,21 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
     return () => clearInterval(timer);
   }, []);
 
+  // Phase 4: Poll AI status
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await api.get<{ status: string; mode: string }>('/api/debug/ai-status');
+        setAiStatus(res.status === "online" ? "online" : "offline");
+      } catch {
+        setAiStatus("offline");
+      }
+    };
+    check();
+    const iv = setInterval(check, 30_000);
+    return () => clearInterval(iv);
+  }, []);
+
   const handlePanic = async () => {
     if (!alertMessage.trim()) return;
     setAlertSending(true);
@@ -45,14 +70,105 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
         severity: "critical",
       });
       setShowRedAlertModal(false);
+      toast.error("KIRMIZI ALARM gönderildi!");
     } catch (e) {
       console.error("Emergency alert failed:", e);
+      toast.error("Alarm gönderilemedi!");
     }
     setTimeout(() => setAlertSending(false), 3000);
   };
 
   const handleQR = async () => {
     setShowQR(!showQR);
+  };
+
+  // Phase 2: Inject earthquake
+  const handleInjectEarthquake = async () => {
+    setSimLoading(true);
+    try {
+      const res = await api.post<any>("/api/debug/inject-earthquake", {
+        lat: 38.4192,
+        lng: 27.1287,
+        magnitude: 6.5,
+        depth: 10,
+        city: "İzmir (Demo)"
+      });
+      toast.success(`SİMÜLASYON BAŞARILI: ${res.zones_created} bölge, ${res.tasks_created} görev oluşturuldu (${res.method})`);
+    } catch (e) {
+      console.error("Inject failed:", e);
+      toast.error("Simülasyon başarısız!");
+    }
+    setSimLoading(false);
+  };
+
+  // Phase 6: Auto-dispatch (Haversine)
+  const handleAutoDispatch = () => {
+    const teams = useTeamStore.getState().teams;
+    const tasks = useTaskStore.getState().tasks;
+    const idleTeams = teams.filter(t => t.status === "idle");
+    const unassigned = tasks.filter(t => t.status === "pending" && (t.priority === "RED" || t.priority === "CRITICAL" || t.priority === "KRİTİK" || t.priority === "HIGH" || t.priority === "YÜKSEK"));
+
+    if (idleTeams.length === 0 || unassigned.length === 0) {
+      toast.info("Atanacak boş ekip veya görev yok.");
+      return;
+    }
+
+    // Haversine
+    const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      let a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      a = Math.max(0, Math.min(1, a)); // clamp to prevent NaN
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    let assigned = 0;
+    const usedTeams = new Set<number>();
+    for (const task of unassigned) {
+      let bestTeam: typeof idleTeams[0] | null = null;
+      let bestDist = Infinity;
+      for (const team of idleTeams) {
+        if (usedTeams.has(team.id)) continue;
+        const d = haversine(team.current_lat ?? 41.0, team.current_lng ?? 28.9, task.lat, task.lng);
+        if (d < bestDist) { bestDist = d; bestTeam = team; }
+      }
+      if (bestTeam) {
+        usedTeams.add(bestTeam.id);
+        useTaskStore.getState().completeTask(task.id, "assigned");
+        assigned++;
+      }
+    }
+    toast.success(`Yapay zeka ${assigned} ekibi en yakın görevlere optimize etti.`);
+  };
+
+  // Phase 6: AAR Export
+  const handleExport = () => {
+    const tasks = useTaskStore.getState().tasks;
+    const teams = useTeamStore.getState().teams;
+    const report = {
+      timestamp: new Date().toISOString(),
+      operation: "TRIAGE_V2_SNAPSHOT",
+      summary: {
+        total_tasks: tasks.length,
+        completed: tasks.filter(t => t.status === "resolved").length,
+        active: tasks.filter(t => t.status === "in_progress" || t.status === "assigned").length,
+        pending: tasks.filter(t => t.status === "pending").length,
+        teams: teams.length,
+        online_teams: teams.filter(t => t.is_online).length,
+      },
+      tasks,
+      teams,
+      timeline: logs.slice(0, 100),
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `operation_snapshot_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.info("Operasyon raporu indirildi.");
   };
 
   return (
@@ -88,6 +204,22 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
             <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
             <span className="text-[10px] font-mono font-bold">{isOnline ? "BAĞLI" : "ÇEVRİMDIŞI"}</span>
           </div>
+
+          <div className="h-4 w-px bg-white/10" />
+
+          {/* Phase 4: AI Status Badge */}
+          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${
+            aiStatus === "online"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+              : aiStatus === "offline"
+              ? "border-red-500/30 bg-red-500/10 text-red-400"
+              : "border-gray-500/30 bg-gray-500/10 text-gray-400"
+          }`}>
+            <Brain className={`h-3 w-3 ${aiStatus === "online" ? "text-emerald-400" : "text-red-400"}`} />
+            <span className="text-[9px] font-mono font-bold">
+              AI: {aiStatus === "online" ? "ONLINE" : aiStatus === "offline" ? "OFFLINE (DETERMİNİSTİK)" : "..."}
+            </span>
+          </div>
         </div>
 
         {/* Center: Title */}
@@ -96,8 +228,43 @@ export default function OpsHeader({ isOnline, teamCount, taskCount }: Props) {
           <span className="text-[8px] text-gray-600 font-mono">KOMUTA MERKEZİ</span>
         </div>
 
-        {/* Right: QR + Panic */}
+        {/* Right: Tools */}
         <div className="flex items-center gap-2">
+          {/* Phase 6: Auto-Dispatch */}
+          <button
+            onClick={handleAutoDispatch}
+            className="px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 transition-colors"
+            title="Yapay Zeka Oto-Atama"
+          >
+            <span className="flex items-center gap-1">
+              <Zap className="h-3 w-3" />
+              OTO-ATA
+            </span>
+          </button>
+
+          {/* Phase 2: Simulation */}
+          <button
+            onClick={handleInjectEarthquake}
+            disabled={simLoading}
+            className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
+              simLoading
+                ? "bg-amber-900 text-amber-300 cursor-not-allowed"
+                : "bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 border border-amber-500/30"
+            }`}
+            title="Deprem Simülasyonu Başlat"
+          >
+            {simLoading ? "İŞLENİYOR..." : "SİMÜLASYON"}
+          </button>
+
+          {/* Phase 6: Export */}
+          <button
+            onClick={handleExport}
+            className="p-1.5 rounded-md hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+            title="Operasyon Raporu İndir"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+
           <button
             onClick={handleQR}
             className="p-1.5 rounded-md hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
