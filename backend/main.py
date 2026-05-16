@@ -165,10 +165,22 @@ async def handle_task_status_update(device_id: str, data: dict):
 
     1. Apply the change to the database (with conflict resolution)
     2. Broadcast the update to all other devices
+    3. Trigger dispatcher hooks (release/reassign/backup)
     """
+    from services.dispatcher import (
+        assign_pending_tasks,
+        handle_backup_request,
+        release_team,
+        broadcast_assignments,
+        broadcast_backup,
+        broadcast_team_release,
+    )
+
     task_data = data.get("data", {})
     if not task_data.get("id"):
         return
+
+    new_status = task_data.get("status", "")
 
     async with async_session() as session:
         applied, conflicts = await process_sync_changes(
@@ -188,6 +200,24 @@ async def handle_task_status_update(device_id: str, data: dict):
                 change.get("data", {}),
                 source_device=device_id,
             )
+
+        # --- Dispatcher hooks ---
+        if new_status in ("resolved", "false_alarm"):
+            async with async_session() as session:
+                release_info = await release_team(session, task_data["id"])
+                if release_info:
+                    await broadcast_team_release(release_info)
+
+                assignments = await assign_pending_tasks(session)
+                if assignments:
+                    await broadcast_assignments(assignments)
+
+        elif new_status == "needs_backup":
+            async with async_session() as session:
+                backup_info = await handle_backup_request(session, task_data["id"])
+                if backup_info:
+                    await broadcast_backup(backup_info)
+
     elif conflicts:
         # Send conflict info back to the originating device
         await ws_manager.send_personal(device_id, {
@@ -195,3 +225,4 @@ async def handle_task_status_update(device_id: str, data: dict):
             "changes": [],
             "conflicts": conflicts,
         })
+

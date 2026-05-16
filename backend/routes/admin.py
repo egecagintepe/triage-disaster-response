@@ -22,6 +22,7 @@ from services.ai_engine import (
     estimate_team_count,
 )
 from services.task_generator import generate_from_analysis
+from services.dispatcher import assign_pending_tasks, broadcast_assignments
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -144,6 +145,12 @@ async def run_ai_analysis(payload: RunAIAnalysisRequest, db: AsyncSession = Depe
     except Exception as e:
         print(f"[AI-FLOW] WebSocket broadcast failed (non-fatal): {e}")
 
+    # --- Step 6: Auto-assign tasks to idle teams ---
+    assignments = await assign_pending_tasks(db)
+    if assignments:
+        await broadcast_assignments(assignments)
+        print(f"[AI-FLOW] Auto-assigned {len(assignments)} tasks to teams")
+
     return {
         "status": "completed",
         "analysis_method": analysis_method,
@@ -154,6 +161,7 @@ async def run_ai_analysis(payload: RunAIAnalysisRequest, db: AsyncSession = Depe
         },
         "zones_created": result["zones_created"],
         "tasks_created": result["tasks_created"],
+        "tasks_assigned": len(assignments),
         "zones": result["zones"],
     }
 

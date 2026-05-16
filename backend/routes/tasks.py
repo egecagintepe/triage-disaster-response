@@ -1,4 +1,8 @@
-"""Task CRUD endpoints – /api/v1/tasks."""
+"""Task CRUD endpoints – /api/v1/tasks.
+
+Hooks into dispatcher for auto-reassignment on completion/cancellation
+and backup workflow on needs_backup status.
+"""
 
 from typing import Optional, List
 from datetime import datetime, timezone
@@ -10,6 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.task import Task
 from schemas.task import TaskCreate, TaskUpdate, TaskResponse
+from services.dispatcher import (
+    assign_pending_tasks,
+    handle_backup_request,
+    release_team,
+    broadcast_assignments,
+    broadcast_backup,
+    broadcast_team_release,
+)
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
 
@@ -53,24 +65,81 @@ async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
     db.add(task)
     await db.commit()
     await db.refresh(task)
+
+    # Auto-assign if there are idle teams
+    assignments = await assign_pending_tasks(db)
+    if assignments:
+        await broadcast_assignments(assignments)
+
     return task
 
 
 @router.patch("/{task_id}", response_model=TaskResponse)
 async def update_task(task_id: int, payload: TaskUpdate, db: AsyncSession = Depends(get_db)):
-    """Update an existing task (partial update)."""
+    """Update an existing task (partial update).
+
+    Dispatcher hooks:
+    - resolved / false_alarm → release team + reassign pending tasks
+    - needs_backup → assign additional idle team
+    """
     result = await db.execute(select(Task).where(Task.id == task_id))
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    old_status = task.status
 
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(task, field, value)
     task.updated_at = datetime.now(timezone.utc)
 
+    # Set lifecycle timestamps
+    new_status = update_data.get("status")
+    if new_status == "assigned" and not task.assigned_at:
+        task.assigned_at = datetime.now(timezone.utc)
+    elif new_status == "in_progress" and not task.started_at:
+        task.started_at = datetime.now(timezone.utc)
+    elif new_status in ("resolved", "false_alarm") and not task.completed_at:
+        task.completed_at = datetime.now(timezone.utc)
+
     await db.commit()
     await db.refresh(task)
+
+    # --- Dispatcher hooks ---
+
+    if new_status in ("resolved", "false_alarm") and old_status != new_status:
+        # Release the assigned team → set idle
+        release_info = await release_team(db, task_id)
+        if release_info:
+            await broadcast_team_release(release_info)
+
+        # Auto-assign any remaining pending tasks to newly idle team
+        assignments = await assign_pending_tasks(db)
+        if assignments:
+            await broadcast_assignments(assignments)
+
+    elif new_status == "needs_backup" and old_status != "needs_backup":
+        # Backup workflow: find additional idle team
+        backup_info = await handle_backup_request(db, task_id)
+        if backup_info:
+            await broadcast_backup(backup_info)
+
+    # Broadcast task update to all devices
+    try:
+        from main import ws_manager
+        await ws_manager.broadcast_task_update({
+            "id": task.id,
+            "status": task.status,
+            "assigned_team_id": task.assigned_team_id,
+            "priority": task.priority,
+            "address": task.address,
+            "lat": task.lat,
+            "lng": task.lng,
+        })
+    except Exception:
+        pass
+
     return task
 
 
@@ -81,5 +150,12 @@ async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)):
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Release team if assigned
+    if task.assigned_team_id:
+        release_info = await release_team(db, task_id)
+        if release_info:
+            await broadcast_team_release(release_info)
+
     await db.delete(task)
     await db.commit()
