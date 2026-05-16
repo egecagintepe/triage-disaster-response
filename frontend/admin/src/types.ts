@@ -47,4 +47,4 @@ export interface RiskZone {
   isHumanOverride?: boolean;
 }
 
-export type ToolMode = "CURSOR" | "PEN" | "OVERRIDE";
+export type ToolMode = "CURSOR" | "PEN" | "OVERRIDE" | "ERASER";

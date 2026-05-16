@@ -110,7 +110,8 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
             priority_score: 3.5, 
             geometry: geojson
           });
-          // Note: ZONE_UPDATE will be broadcasted by backend to sync
+          // Remove manual layer, let WebSocket update trigger React render
+          map.removeLayer(layer);
         } catch (err) {
           console.error("Bölge oluşturulamadı:", err);
           map.removeLayer(layer); // remove if failed
@@ -139,6 +140,12 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         await api.patch(`/api/v1/zones/${zone.id}`, { priority_score: nextPriorityScore });
       } catch (e) {
         console.error("Zone priority override failed", e);
+      }
+    } else if (toolMode === "ERASER") {
+      try {
+        await api.delete(`/api/v1/zones/${zone.id}`);
+      } catch (e) {
+        console.error("Zone deletion failed", e);
       }
     }
   };
@@ -236,7 +243,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         })}
 
         {/* Task Markers — diamond-shaped, color = priority */}
-        {tasks.map((task) => (
+        {tasks.filter(t => t.status !== "resolved" && t.status !== "false_alarm").map((task) => (
           <Marker
             key={`task-${task.id}`}
             position={[task.lat, task.lng]}

@@ -9,7 +9,7 @@ class Team(Base):
     __tablename__ = "teams"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_ip = Column(String(15), unique=True, nullable=False)
+    device_ip = Column(String(15), nullable=False)
     device_id = Column(String(50), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     status = Column(String(20), default="offline")  # offline, idle, busy

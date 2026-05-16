@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { IntelligenceLog, LogType } from "../types";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 
 interface Props {
   logs: IntelligenceLog[];
@@ -20,11 +22,29 @@ interface Props {
  * 3. History: Consider implementing a local search or filtering mechanism for archived logs.
  */
 export default function IntelligenceLogPanel({ logs }: Props) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <aside className="absolute right-6 top-6 bottom-6 w-96 glass-panel flex flex-col overflow-hidden z-[1001] border-white/[0.04]">
+    <>
+      <button 
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-[1002] bg-zinc-950 border-y border-l border-white/10 p-2 rounded-l-lg hover:bg-zinc-900 transition-colors"
+      >
+        {isCollapsed ? <ChevronLeft className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+      </button>
+
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.aside 
+            initial={{ x: 400 }}
+            animate={{ x: 0 }}
+            exit={{ x: 400 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="absolute right-6 top-6 bottom-6 w-96 glass-panel flex flex-col overflow-hidden z-[1001] border-white/[0.04]"
+          >
       <div className="p-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
         <h3 className="text-gray-400 text-[10px] font-bold tracking-[0.2em] uppercase">
-          MATRIX_FEED_v4.2
+          SON DURUM BİLDİRİMLERİ
         </h3>
         <span className="text-[9px] font-mono text-emerald-500 animate-pulse">● LIVE</span>
       </div>
@@ -76,10 +96,13 @@ export default function IntelligenceLogPanel({ logs }: Props) {
         
         {logs.length === 0 && (
           <div className="h-full flex items-center justify-center">
-            <p className="text-gray-600 font-mono text-xs animate-pulse tracking-tighter">UPLINK_ESTABLISHED... WAITING_FOR_SIGS</p>
+            <p className="text-gray-600 font-mono text-xs animate-pulse tracking-tighter">BAĞLANTI_KURULUYOR... VERİ_BEKLENİYOR</p>
           </div>
         )}
       </div>
-    </aside>
+    </motion.aside>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

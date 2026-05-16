@@ -4,7 +4,8 @@
  */
 
 import { useState } from "react";
-import { Battery, Signal, Zap, MousePointer2, PenTool, Star, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Battery, Signal, Zap, MousePointer2, PenTool, Star, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight, Eraser } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { FieldUnit, UnitStatus, ToolMode } from "../types";
 import type { Task } from "../services/localDb";
 import { useTaskStore } from "../stores/taskStore";
@@ -56,6 +57,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
     { id: "CURSOR" as ToolMode, icon: MousePointer2, label: "Manuel Atama" },
     { id: "PEN" as ToolMode, icon: PenTool, label: "Bölge Çiz" },
     { id: "OVERRIDE" as ToolMode, icon: Star, label: "Öncelik Ezme" },
+    { id: "ERASER" as ToolMode, icon: Eraser, label: "Bölge Sil" },
   ];
 
   const handleUnitClick = (unit: FieldUnit) => {
@@ -79,8 +81,23 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
   const activeTasks = tasks.filter((t) => t.status === "in_progress" || t.status === "assigned");
   const backupTasks = tasks.filter((t) => t.status === "needs_backup");
 
-  return (
-    <div className="absolute left-6 top-6 bottom-6 w-80 glass-panel flex flex-col pointer-events-auto border-white/[0.04] z-[1005]">
+    <>
+      <button 
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-[1002] bg-zinc-950 border-y border-r border-white/10 p-2 rounded-r-lg hover:bg-zinc-900 transition-colors"
+      >
+        {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronLeft className="h-4 w-4 text-gray-400" />}
+      </button>
+
+      <AnimatePresence>
+        {!isCollapsed && (
+          <motion.div 
+            initial={{ x: -400 }}
+            animate={{ x: 0 }}
+            exit={{ x: -400 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="absolute left-6 top-6 bottom-6 w-80 glass-panel flex flex-col pointer-events-auto border-white/[0.04] z-[1001]"
+          >
       {/* SECTION: INTEGRATED TOOLBAR */}
       <div className="p-3 border-b border-white/[0.06] bg-white/[0.01] flex justify-between items-center gap-2">
         <div className="flex gap-2">
@@ -343,6 +360,9 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
            {[1,2,3,4,5].map(i => <div key={i} className={`w-0.5 h-3 ${i < 4 ? "bg-blue-500" : "bg-white/10"} rounded-full`} />)}
         </div>
       </footer>
-    </div>
+    </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

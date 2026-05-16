@@ -4,6 +4,7 @@ import json
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -117,6 +118,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
 
 # CORS – permissive for LAN usage
 app.add_middleware(
