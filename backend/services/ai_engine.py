@@ -207,6 +207,8 @@ async def analyze_with_gemini(
     """
     mag = earthquake_data.get('magnitude', 5.0)
     depth = earthquake_data.get('depth_km', 10.0)
+    
+    # We now also pass rupture_length and aftershocks via earthquake_data from afad_client
     impact_radius_km = calculate_impact_radius(mag, depth)
 
     if not GEMINI_API_KEY or GEMINI_API_KEY.endswith("_here"):
@@ -258,6 +260,8 @@ DEPREM VERİLERİ:
 - Derinlik: {earthquake_data.get('depth_km', 'N/A')} km
 - Merkez Üssü: {earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 'N/A'))}, {earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 'N/A'))}
 - Hesaplanmış Etki Yarıçapı (Algoritma Çıktısı): {impact_radius_km} km
+- Kırılma Uzunluğu (Wells & Coppersmith): {earthquake_data.get('rupture_length_km', 'N/A')} km
+- Tahmini Artçı Şok (Omori Yasası): {earthquake_data.get('estimated_aftershocks', 'N/A')} adet / 6 saat
 - Simüle Edilen Bina Yoğunluğu: Etki alanında yaklaşık {simulated_density} bina.
 
 BÖLGE VERİLERİ:

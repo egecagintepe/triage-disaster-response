@@ -71,6 +71,7 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
         touchZoom={true}
         doubleClickZoom={true}
         scrollWheelZoom={true}
+        preferCanvas={true}
       >
         <OfflineTileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
