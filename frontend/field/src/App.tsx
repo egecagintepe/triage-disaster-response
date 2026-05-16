@@ -38,7 +38,6 @@ export default function App() {
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [showQrShare, setShowQrShare] = useState(false);
   const [showQrScanner, setShowQrScanner] = useState(false);
-  const [showQrLayer, setShowQrLayer] = useState(false);
 
   // Active task = first pending/assigned/in_progress task for this device
   const activeTask: Task | undefined = tasks.find(
@@ -267,7 +266,7 @@ export default function App() {
                       <SwipeButton
                         label="Görev Paylaştır →"
                         thumbColor="bg-amber-500"
-                        onConfirm={async () => setShowQrLayer(true)}
+                        onConfirm={() => setShowQrShare(true)}
                       />
                       <SwipeButton
                         label="Hasar Yok / İptal →"
@@ -287,6 +286,12 @@ export default function App() {
                       <SwipeButton
                         label="Görev Paylaştır →"
                         thumbColor="bg-amber-500"
+                        onConfirm={() => setShowQrShare(true)}
+                      />
+                      <SwipeButton
+                        label="Destek Talep Et →"
+                        thumbColor="bg-red-600"
+                        pulse
                         onConfirm={handleRequestBackup}
                       />
                       <SwipeButton
@@ -294,20 +299,6 @@ export default function App() {
                         thumbColor="bg-gray-600"
                         onConfirm={handleCancel}
                       />
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setShowQrShare(true)}
-                          className="flex-1 py-3 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 font-bold rounded-xl transition-colors text-sm"
-                        >
-                          📤 QR Paylaş
-                        </button>
-                        <button
-                          onClick={() => setShowQrScanner(true)}
-                          className="flex-1 py-3 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-300 font-bold rounded-xl transition-colors text-sm"
-                        >
-                          📥 QR Al
-                        </button>
-                      </div>
                     </>
                   )}
                 </motion.div>
@@ -352,32 +343,6 @@ export default function App() {
       </main>
 
       {/* QR Modals */}
-      {showQrLayer && (
-        <div className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6">
-          <div className="w-full max-w-sm flex flex-col gap-4">
-            <h2 className="text-xl font-bold text-white text-center mb-4">GÖREV PAYLAŞIMI</h2>
-            <button
-              onClick={() => { setShowQrLayer(false); setShowQrShare(true); }}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 text-white font-bold rounded-xl shadow-lg transition-colors text-lg"
-            >
-              📤 QR ile Görev Paylaş
-            </button>
-            <button
-              onClick={() => { setShowQrLayer(false); setShowQrScanner(true); }}
-              className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 border border-cyan-400 text-white font-bold rounded-xl shadow-lg transition-colors text-lg"
-            >
-              📥 QR Oku / Görev Al
-            </button>
-            <button
-              onClick={() => setShowQrLayer(false)}
-              className="w-full mt-4 py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors"
-            >
-              İptal / Geri
-            </button>
-          </div>
-        </div>
-      )}
-      
       {showQrShare && tasks.length > 0 && (
         <QrShareModal tasks={tasks} onClose={() => setShowQrShare(false)} />
       )}

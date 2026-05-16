@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { IntelligenceLog, LogType } from "../types";
 import { ChevronRight, ChevronLeft, CheckCircle2, Bot } from "lucide-react";
@@ -13,6 +13,19 @@ import { api } from "../services/api";
 interface Props {
   logs: IntelligenceLog[];
 }
+
+// Priority sort weight (lower = higher priority = top of list)
+const PRIORITY_WEIGHT: Record<string, number> = {
+  'RED': 1, 'CRITICAL': 1, 'KRİTİK': 1,
+  'YELLOW': 2, 'HIGH': 2, 'YÜKSEK': 2,
+  'MEDIUM': 3, 'ORTA': 3,
+  'GREEN': 4, 'LOW': 4, 'DÜŞÜK': 4,
+};
+
+const isLowPriority = (priority: string): boolean => {
+  const p = priority.toUpperCase();
+  return p === 'GREEN' || p === 'LOW' || p === 'DÜŞÜK' || p === '1' || p === '2';
+};
 
 /**
  * FUTURE AGENT NOTE:
@@ -26,9 +39,25 @@ interface Props {
 export default function IntelligenceLogPanel({ logs }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const tasks = useTaskStore((s) => s.tasks);
-  const pendingAiTasks = tasks.filter((t) => t.status === "pending_approval");
-
   const completeTask = useTaskStore((s) => s.completeTask);
+  const autoApprovedRef = useRef<Set<number>>(new Set());
+
+  // Auto-approve non-DÜŞÜK tasks (HIGH/CRITICAL auto-queue)
+  const allPendingApproval = tasks.filter((t) => t.status === "pending_approval");
+  useEffect(() => {
+    for (const task of allPendingApproval) {
+      if (!isLowPriority(task.priority) && !autoApprovedRef.current.has(task.id)) {
+        autoApprovedRef.current.add(task.id);
+        completeTask(task.id, "pending");
+      }
+    }
+  }, [allPendingApproval, completeTask]);
+
+  // Only DÜŞÜK tasks stay for manual approval, sorted by priority
+  const pendingAiTasks = allPendingApproval
+    .filter(t => isLowPriority(t.priority))
+    .sort((a, b) => (PRIORITY_WEIGHT[a.priority.toUpperCase()] ?? 5) - (PRIORITY_WEIGHT[b.priority.toUpperCase()] ?? 5));
+
   const handleApprove = async (taskId: number) => {
     await completeTask(taskId, "pending");
   };

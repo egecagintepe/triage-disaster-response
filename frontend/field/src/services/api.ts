@@ -1,34 +1,45 @@
 /**
- * TRIAGE V2 — REST API Client (Field)
+ * TRIAGE — REST API Client (Field)
  *
  * Thin wrapper around fetch() for communicating with the FastAPI backend.
  * Used by the sync queue to push offline changes.
  *
- * The base URL defaults to the LAN master node but can be overridden
- * via VITE_API_URL environment variable.
+ * URL resolution priority:
+ *   1. localStorage 'triage_server_ip' (user override from Settings)
+ *   2. VITE_API_URL environment variable
+ *   3. Same-origin detection (LAN/Network access)
+ *   4. Fallback: https://saha.gokberkceviker.com.tr
  */
 
-export const getApiBase = () => {
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  
-  // Force API to use the same IP if accessed via LAN/Network
-  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-    return `http://${hostname}:8000`;
+export const getApiBase = (): string => {
+  // Priority 1: User override via Settings panel
+  const savedIp = localStorage.getItem('triage_server_ip');
+  if (savedIp) {
+    // If user saved a full URL, use as-is; otherwise wrap with http://
+    return savedIp.startsWith('http') ? savedIp : `http://${savedIp}`;
   }
 
+  // Priority 2: Build-time env var
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  
-  const savedIp = localStorage.getItem('triage_server_ip');
-  if (savedIp) return `http://${savedIp}`;
 
-  return 'https://api.gokberkceviker.com.tr';
+  // Priority 3: Same-origin detection for LAN deployments
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `${window.location.protocol}//${hostname}:8000`;
+    }
+  }
+
+  // Priority 4: Production fallback
+  return 'https://saha.gokberkceviker.com.tr';
 };
 
-export const getWsBase = () => {
+export const getWsBase = (): string => {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
-  
+
   const base = getApiBase();
-  return base.replace(/^http/, 'ws');
+  // Proper protocol mapping: https → wss, http → ws
+  return base.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
 };
 
 let isRefreshing = false;

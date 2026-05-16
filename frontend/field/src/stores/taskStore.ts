@@ -37,8 +37,16 @@ export const useTaskStore = create<TaskState>()(
 
       setActiveTask: (task) => set({ activeTask: task }),
 
-      addTask: (task) =>
-        set((state) => ({ tasks: [...state.tasks, task] })),
+      addTask: (newTask) =>
+        set((state) => {
+          const existingIndex = state.tasks.findIndex(t => t.id === newTask.id);
+          if (existingIndex > -1) {
+            const updated = [...state.tasks];
+            updated[existingIndex] = { ...updated[existingIndex], ...newTask };
+            return { tasks: updated };
+          }
+          return { tasks: [...state.tasks, newTask] };
+        }),
 
       updateTask: (updatedTask) =>
         set((state) => ({

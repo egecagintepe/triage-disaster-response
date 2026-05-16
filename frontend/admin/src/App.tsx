@@ -80,6 +80,7 @@ export default function App() {
   );
   const [toolMode, setToolMode] = useState<ToolMode>("CURSOR");
   const [logs, setLogs] = useState<IntelligenceLog[]>([]);
+  const [kandilliEq, setKandilliEq] = useState<any>(null);
   const isOnline = useOnlineStatus();
 
   // Zustand stores
@@ -98,26 +99,27 @@ export default function App() {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      // Load zones from Dexie if available
-      const dbZones = await db.zones.toArray();
-      if (dbZones.length > 0) {
-        setZones(dbZones.map(zoneToRiskZone));
-      } else if (isAuthenticated) {
-        // Fallback to REST API if Dexie is empty
+      if (isAuthenticated) {
+        // --- Zones: API-first, fallback to Dexie ---
         try {
           const apiZones = await api.get<Zone[]>('/api/v1/zones');
           console.log("[API] Zones fetched:", apiZones);
-          if (apiZones && apiZones.length > 0) {
-            await db.zones.bulkPut(apiZones);
+          if (apiZones) {
+            await db.zones.clear();
+            if (apiZones.length > 0) {
+              await db.zones.bulkPut(apiZones);
+            }
             setZones(apiZones.map(zoneToRiskZone));
           }
         } catch (error) {
           console.error("[API] Failed to fetch Zones. Error:", error);
+          const dbZones = await db.zones.toArray();
+          if (dbZones.length > 0) {
+            setZones(dbZones.map(zoneToRiskZone));
+          }
         }
-      }
 
-      // Also fetch Teams and Tasks if they are empty
-      if (isAuthenticated && storeTeams.length === 0) {
+        // --- Teams: always refresh ---
         try {
           const teams = await api.get<Team[]>('/api/v1/teams');
           console.log("[API] Teams fetched:", teams);
@@ -128,18 +130,40 @@ export default function App() {
         } catch (error) {
           console.error("[API] Failed to fetch Teams. Error:", error);
         }
-      }
-      
-      if (isAuthenticated && storeTasks.length === 0) {
+
+        // --- Tasks: API-first + ghost cleanup ---
         try {
           const tasks = await api.get<Task[]>('/api/v1/tasks');
           console.log("[API] Tasks fetched:", tasks);
-          if (tasks && tasks.length > 0) {
-            await db.tasks.bulkPut(tasks);
-            useTaskStore.getState().setTasks(tasks);
+          if (tasks) {
+            // Ghost cleanup: delete local tasks not on backend
+            const backendTaskIds = new Set(tasks.map(t => t.id));
+            const localTasks = await db.tasks.toArray();
+            for (const localTask of localTasks) {
+              if (!backendTaskIds.has(localTask.id)) {
+                await db.tasks.delete(localTask.id);
+              }
+            }
+
+            if (tasks.length > 0) {
+              await db.tasks.bulkPut(tasks);
+            }
+
+            const updatedLocalTasks = await db.tasks.toArray();
+            useTaskStore.getState().setTasks(updatedLocalTasks);
           }
         } catch (error) {
           console.error("[API] Failed to fetch Tasks. Error:", error);
+          const dbTasks = await db.tasks.toArray();
+          if (dbTasks.length > 0) {
+            useTaskStore.getState().setTasks(dbTasks);
+          }
+        }
+      } else {
+        // Not authenticated — load from Dexie only
+        const dbZones = await db.zones.toArray();
+        if (dbZones.length > 0) {
+          setZones(dbZones.map(zoneToRiskZone));
         }
       }
     };
@@ -211,6 +235,24 @@ export default function App() {
         toast(msg);
       }
       addLog("WS_BROADCAST", msg, LogType.AI);
+
+      // Step 13: Capture earthquake metadata from broadcast payload
+      if (detail?.earthquake) {
+        const eq = detail.earthquake;
+        const mag = parseFloat(eq.magnitude || eq.mag || 0);
+        if (mag > 0) {
+          const enriched = {
+            ...eq,
+            mag: mag,
+            depth: eq.depth_km || eq.depth || '?',
+            rupture_length_km: eq.rupture_length_km || (mag >= 4.0 ? Math.pow(10, 0.69 * mag - 3.22).toFixed(2) : '0'),
+            estimated_aftershocks: eq.estimated_aftershocks || Math.max(1, Math.floor((15 * (mag / 5.0)) / Math.pow(6.1, 1.1))),
+            source: eq.source || 'AI_ENGINE/SİMÜLASYON',
+            title: eq.location || eq.title || 'Bilinmeyen Konum',
+          };
+          setKandilliEq(enriched);
+        }
+      }
     };
 
     const handleNewTask = () => {
@@ -276,6 +318,7 @@ export default function App() {
           setToolMode={setToolMode}
           tasks={storeTasks}
           isOnline={isOnline}
+          kandilliEqOverride={kandilliEq}
         />
         
         <IntelligenceLogPanel logs={logs} />

@@ -85,6 +85,51 @@ def calculate_priority_score_fallback(
     return round(min(max(score, 1.0), 5.0), 1)
 
 
+def calculate_priority_score_scientific(
+    magnitude: float,
+    depth_km: float,
+    distance_km: float,
+    population_density: int = 0,
+    old_building_ratio: float = 0.0,
+) -> float:
+    """Scientific exponential energy scoring — secondary comparative metric.
+
+    Uses exponential seismic energy scaling, depth attenuation, and
+    logarithmic normalization for a more physically accurate score.
+    Returns a score between 1.0 (low) and 5.0 (critical).
+
+    NOTE: This does NOT replace calculate_priority_score_fallback().
+    It serves as a secondary scientific reference for comparison/logging.
+    """
+    # Sub-destructive earthquakes — no physical damage expected
+    if magnitude < 3.5:
+        return 1.0
+
+    # 1. Seismic Energy Base (exponential scale)
+    energy_factor = math.exp(magnitude - 4.5)
+
+    # 2. Depth Attenuation (shallower = exponentially more surface damage)
+    depth_attenuation = 20.0 / (depth_km + 5.0)
+
+    # 3. Distance Decay (inverse scaling)
+    distance_factor = 50.0 / (distance_km + 10.0)
+
+    # 4. Vulnerability Modifiers
+    pop_factor = min(2.0, population_density / 20000.0)
+    bldg_factor = 1.0 + (old_building_ratio * 1.5)
+
+    # 5. Raw Impact Calculation
+    raw_score = (energy_factor * depth_attenuation * distance_factor) * (1.0 + pop_factor) * bldg_factor
+
+    # 6. Logarithmic Normalization to 1.0-5.0 scale
+    if raw_score <= 0:
+        final_score = 1.0
+    else:
+        final_score = 1.0 + (math.log1p(raw_score) * 0.8)
+
+    return round(max(1.0, min(5.0, final_score)), 1)
+
+
 def classify_priority(score: float) -> str:
     """Convert a priority score to KRİTİK/YÜKSEK/ORTA/DÜŞÜK classification."""
     if score >= 4.0:

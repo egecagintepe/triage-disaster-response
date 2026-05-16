@@ -274,7 +274,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                           İPTAL
                         </button>
                       </div>
-                      {storeTeams.filter(t => t.status === "idle").map(team => (
+                      {storeTeams.filter(t => t.status !== "offline").map(team => (
                         <button
                           key={team.id}
                           onClick={async (e) => { 
@@ -286,17 +286,24 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                               });
                               useTaskStore.getState().updateTask({ id: task.id, status: 'assigned', assigned_team_id: team.id });
                               useTeamStore.getState().updateTeamStatus(team.id, 'busy');
+                              await db.teams.update(team.id, { status: 'busy' });
                               setAssigningTaskId(null);
                             } catch (err) {
                               console.error(err);
                             }
                           }}
-                          className="w-full text-left text-[9px] font-bold bg-blue-600/10 hover:bg-blue-600/30 text-blue-300 border border-blue-500/20 rounded px-2 py-1.5 transition-colors"
+                          className={`w-full text-left text-[9px] font-bold rounded px-2 py-1.5 transition-colors border ${
+                            team.status === 'busy'
+                              ? 'bg-amber-600/10 hover:bg-amber-600/30 text-amber-300 border-amber-500/20'
+                              : 'bg-blue-600/10 hover:bg-blue-600/30 text-blue-300 border-blue-500/20'
+                          }`}
                         >
-                          [ Atanacak: {team.name} ]
+                          {team.status === 'busy'
+                            ? `[ Meşgul - Kuyruğa Ekle: ${team.name} ]`
+                            : `[ Atanacak: ${team.name} ]`}
                         </button>
                       ))}
-                      {storeTeams.filter(t => t.status === "idle").length === 0 && (
+                      {storeTeams.filter(t => t.status !== "offline").length === 0 && (
                         <span className="text-[8px] text-red-400">Uygun ekip yok</span>
                       )}
                     </div>
@@ -354,7 +361,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                           İPTAL
                         </button>
                       </div>
-                      {storeTeams.filter(t => t.status === "idle" && t.name.toLowerCase() !== "admin" && t.name.toLowerCase() !== "komuta merkezi").map(team => (
+                      {storeTeams.filter(t => t.status !== "offline" && t.name.toLowerCase() !== "admin" && t.name.toLowerCase() !== "komuta merkezi").map(team => (
                         <button
                           key={team.id}
                           onClick={async (e) => { 
@@ -366,17 +373,24 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                               });
                               useTaskStore.getState().updateTask({ id: task.id, status: 'assigned', assigned_team_id: team.id });
                               useTeamStore.getState().updateTeamStatus(team.id, 'busy');
+                              await db.teams.update(team.id, { status: 'busy' });
                               setAssigningTaskId(null);
                             } catch (err) {
                               console.error(err);
                             }
                           }}
-                          className="w-full text-left text-[9px] font-bold bg-blue-600/10 hover:bg-blue-600/30 text-blue-300 border border-blue-500/20 rounded px-2 py-1.5 transition-colors"
+                          className={`w-full text-left text-[9px] font-bold rounded px-2 py-1.5 transition-colors border ${
+                            team.status === 'busy'
+                              ? 'bg-amber-600/10 hover:bg-amber-600/30 text-amber-300 border-amber-500/20'
+                              : 'bg-blue-600/10 hover:bg-blue-600/30 text-blue-300 border-blue-500/20'
+                          }`}
                         >
-                          [ Atanacak: {team.name} ]
+                          {team.status === 'busy'
+                            ? `[ Meşgul - Kuyruğa Ekle: ${team.name} ]`
+                            : `[ Atanacak: ${team.name} ]`}
                         </button>
                       ))}
-                      {storeTeams.filter(t => t.status === "idle" && t.name.toLowerCase() !== "admin" && t.name.toLowerCase() !== "komuta merkezi").length === 0 && (
+                      {storeTeams.filter(t => t.status !== "offline" && t.name.toLowerCase() !== "admin" && t.name.toLowerCase() !== "komuta merkezi").length === 0 && (
                         <span className="text-[8px] text-red-400">Uygun ekip yok</span>
                       )}
                     </div>

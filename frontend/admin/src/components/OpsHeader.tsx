@@ -193,7 +193,7 @@ export default function OpsHeader({ isOnline, teamCount, taskCount, logs = [] }:
 
         {/* Center: Title */}
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-          <span className="text-[10px] font-bold text-gray-500 tracking-[0.3em] uppercase">TRIAGE V2</span>
+          <span className="text-[10px] font-bold text-gray-500 tracking-[0.3em] uppercase">TRIAGE</span>
           <span className="text-[8px] text-gray-600 font-mono">KOMUTA MERKEZİ</span>
         </div>
 
@@ -317,7 +317,9 @@ export default function OpsHeader({ isOnline, teamCount, taskCount, logs = [] }:
             >
               <X className="h-5 w-5" />
             </button>
-            <AlertTriangle className="h-10 w-10 text-red-500 mb-4 animate-pulse" />
+            <div className="h-10 w-10 mb-4 relative">
+              <AlertTriangle className="h-10 w-10 text-red-500 absolute inset-0 animate-pulse" />
+            </div>
             <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Kritik Acil Durum İletisi</h3>
             <p className="text-gray-400 text-xs mb-6">Tüm saha personeline iletilecek acil durum mesajını girin. Bu işlem geri alınamaz ve anında tüm cihazlarda siren çaldırır.</p>
             

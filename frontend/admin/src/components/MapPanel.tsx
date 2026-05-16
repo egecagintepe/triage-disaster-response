@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MapContainer, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON, TileLayer, Marker, FeatureGroup } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
@@ -78,6 +78,7 @@ interface Props {
   setToolMode: (mode: ToolMode) => void;
   tasks?: Task[];
   isOnline?: boolean;
+  kandilliEqOverride?: any;
 }
 
 /**
@@ -89,11 +90,31 @@ interface Props {
  * 2. Risk Zones: Polygons can be fetched from /api/geofence or /api/intelligence/zones.
  * 3. Interactions: Click events on map coordinates can trigger 'Move To' commands to units.
  */
-export default function MapPanel({ units, riskZones, toolMode, setToolMode, tasks = [], isOnline = true }: Props) {
+export default function MapPanel({ units, riskZones, toolMode, setToolMode, tasks = [], isOnline = true, kandilliEqOverride }: Props) {
   const [map, setMap] = useState<L.Map | null>(null);
   const position: [number, number] = [41.0082, 28.9784];
-  const [kandilliEq, setKandilliEq] = useState<any>(null);
+  const [internalKandilliEq, setInternalKandilliEq] = useState<any>(null);
+  
+  // Prefer WS-propagated data over internal fetch
+  const kandilliEq = kandilliEqOverride || internalKandilliEq;
   const [faultLines, setFaultLines] = useState<any>(null);
+  const prevTaskCountRef = useRef(tasks.length);
+
+  // Step 12: Auto-flyTo newest task when a new crisis arrives
+  useEffect(() => {
+    if (!map) return;
+    const prevCount = prevTaskCountRef.current;
+    prevTaskCountRef.current = tasks.length;
+
+    // Only fly when count increases (new task added), not on initial load
+    if (tasks.length > prevCount && prevCount > 0) {
+      const activeTasks = tasks.filter(t => t.status !== 'resolved' && t.status !== 'false_alarm');
+      const newest = activeTasks[activeTasks.length - 1];
+      if (newest && !isNaN(newest.lat) && !isNaN(newest.lng)) {
+        map.flyTo([newest.lat, newest.lng], 13, { animate: true, duration: 1.5 });
+      }
+    }
+  }, [map, tasks.length]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -108,7 +129,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           const K = 15 * (mag / 5.0);
           eq.estimated_aftershocks = Math.max(1, Math.floor(K / Math.pow(6.1, 1.1)));
           eq.source = "AFAD/Kandilli/EMSC";
-          setKandilliEq(eq);
+          setInternalKandilliEq(eq);
         }
       })
       .catch(() => {});
