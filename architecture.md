@@ -1,6 +1,6 @@
 TRIAGE V2 - System Architecture Documentation
 markdown# TRIAGE V2 - Offline-First Afet Yönetim Sistemi
-## Sistem Mimarisi ve Teknik Dokümantasyon
+## Sistem Mimarisi ve Teknik Dokümantasyon (FINAL VERSION)
 
 ---
 
@@ -18,7 +18,7 @@ markdown# TRIAGE V2 - Offline-First Afet Yönetim Sistemi
 10. [Güvenlik ve Hata Yönetimi](#güvenlik-ve-hata-yönetimi)
 11. [Proje Klasör Yapısı](#proje-klasör-yapısı)
 12. [Geliştirme Aşamaları ve Roadmap](#geliştirme-aşamaları-ve-roadmap)
-13. [Frontend Şablon Entegrasyon Planı](#frontend-şablon-entegrasyon-planı)
+13. [P2P QR Networking (Proportional Split)](#p2p-qr-networking-proportional-split)
 14. [Deployment ve DevOps](#deployment-ve-devops)
 15. [Test Stratejisi](#test-stratejisi)
 16. [Performans Optimizasyonu](#performans-optimizasyonu)
@@ -29,27 +29,29 @@ markdown# TRIAGE V2 - Offline-First Afet Yönetim Sistemi
 ## 1. Sistem Genel Bakış
 
 ### 1.1 Vizyon
-**"Depremde internet çöktüğünde bile çalışan sistem."**
+**"Depremde internet çöktüğünde bile çalışan, otonom ve estetik komuta sistemi."**
 
-TRIAGE V2, afet anında kritik altyapının (internet, GSM) çöktüğü senaryoda bile kesintisiz çalışabilen, asimetrik bir afet yönetim platformudur.
+TRIAGE V2, afet anında kritik altyapının (internet, GSM) çöktüğü senaryoda bile kesintisiz çalışabilen, Cyber-Baroque tasarım diliyle optimize edilmiş asimetrik bir afet yönetim platformudur.
 
 ### 1.2 Temel Çalışma Prensibi
-[Kandilli/AFAD API] → [Master Node AI Processing] → [Local Network Distribution]
+[Kandilli/AFAD API] → [Autonomous AI Loop] → [Master Node AI Processing] → [Local Network Distribution]
 ↓
 [WebSocket Sync Layer]
 ↓
 [Field Devices with Local DB]
 ↓
-[Autonomous Operation]
+[Autonomous Operation & P2P Handoff]
 
 ### 1.3 Kritik Özellikler
 
 - **Internet-Independent:** İnternet kesintisinde bile %100 operasyonel
-- **AI-Powered Triage:** Gemini API ile otomatik önceliklendirme
-- **Real-time Sync:** WebSockets ile milisaniye seviyesinde senkronizasyon
-- **Dynamic Task Assignment:** Ekiplere otomatik ve dinamik görev dağılımı
-- **Offline-First:** Tüm operasyonlar offline modda çalışabilir
-- **Zero-Latency UX:** Kullanıcı hiçbir zaman "loading" görmez
+- **Cyber-Baroque OLED UI:** Yüksek kontrastlı, göz yormayan, premium estetik tasarım.
+- **Autonomous AI Triage:** Gemini 2.5 Flash ile saniyeler içinde otonom analiz ve görev dağıtımı.
+- **Seismological Heuristics:** Kırılma uzunluğu (rupture length) ve etki yarıçapı tabanlı bilimsel simülasyon.
+- **Real-time Sync:** WebSockets ile milisaniye seviyesinde senkronizasyon.
+- **P2P QR Networking:** İnternetsiz ortamda cihazlar arası görev bölüşümü.
+- **Offline-First:** Tüm operasyonlar offline modda başlar ve devam eder.
+- **Zero-Latency UX:** Zustand + Dexie.js ile anında tepki veren arayüz.
 
 ---
 
@@ -212,55 +214,42 @@ Notify user of sync status
 
 ```json
 {
-  "framework": "React 18.3+",
+  "framework": "React 18.3+ (TypeScript)",
   "buildTool": "Vite 5+",
-  "styling": "TailwindCSS 3.4+",
-  "stateManagement": "Zustand / Jotai",
-  "routing": "React Router v6",
-  "localDB": "Dexie.js 4+",
-  "maps": "Leaflet.js 1.9+",
-  "httpClient": "Axios",
-  "websocket": "Socket.io-client",
-  "pwa": "Vite PWA Plugin",
-  "icons": "Lucide React",
-  "charts": "Recharts (optional for analytics)"
+  "styling": "TailwindCSS 4.0 (Modern Engine)",
+  "designSystem": "Cyber-Baroque (Custom OLED-Optimized)",
+  "stateManagement": "Zustand (Persistent)",
+  "localDB": "Dexie.js (IndexedDB)",
+  "maps": "Leaflet.js 1.9+ (Offline Tiles)",
+  "syncLayer": "WebSockets (Socket.io-client)",
+  "networking": "QR-Based P2P Handoff",
+  "pwa": "Vite PWA Plugin (Offline Manifest)"
 }
 ```
 
-#### 4.1.1 Neden Zustand/Jotai?
-- **Redux yerine:** 10x daha az boilerplate
-- **Context API yerine:** Re-render optimizasyonu
-- **Persist desteği:** LocalStorage ile auto-sync
+#### 4.1.1 Cyber-Baroque Design System
+- **OLED Black Base:** `#000000` temelinde, düşük güç tüketimi ve yüksek gece görünürlüğü.
+- **Glowing Accents:** Kritik durumlar için `pulsing` glow efektleri.
+- **Glassmorphism:** `backdrop-blur-2xl` ile derinlik algısı.
+- **Typography:** Inter (Sans) ve JetBrains Mono (Terminal) font kombinasyonu.
 
-```javascript
-// Zustand store örneği
-import create from 'zustand';
-import { persist } from 'zustand/middleware';
-
-export const useTaskStore = create(
+#### 4.1.2 Zustand State Logic
+```typescript
+// taskStore.ts - Final Implementation
+export const useTaskStore = create<TaskState>()(
   persist(
     (set, get) => ({
       tasks: [],
-      activeTask: null,
-      
-      setActiveTask: (task) => set({ activeTask: task }),
-      
       completeTask: async (taskId, status) => {
-        // Optimistic update
-        set(state => ({
-          tasks: state.tasks.map(t => 
-            t.id === taskId ? { ...t, status } : t
-          )
-        }));
-        
-        // Persist to Dexie
-        await db.tasks.update(taskId, { status });
-        
-        // Queue for server sync
-        syncQueue.add({ taskId, status });
+        // 1. Optimistic Update
+        // 2. Dexie Persist
+        // 3. Queue for Sync
+      },
+      autoDispatch: async () => {
+        // Proximity-aware matching logic
       }
     }),
-    { name: 'triage-tasks' }
+    { name: 'triage-admin-tasks' }
   )
 );
 ```
@@ -275,59 +264,15 @@ websockets==12.0
 pydantic==2.9.0
 sqlalchemy==2.0.35
 aiosqlite==0.20.0
-python-multipart==0.0.9
-google-generativeai==0.8.0  # Gemini API
-python-jose[cryptography]==3.3.0  # JWT tokens
-passlib[bcrypt]==1.7.4  # Password hashing
-httpx==0.27.0  # Async HTTP client
-python-dotenv==1.0.0
+google-generativeai==0.8.0  # Gemini 2.5 Flash
+slowapi==0.1.9              # Rate Limiting
+qrcode[pil]==7.4.2          # P2P Onboarding
 ```
 
-#### 4.2.1 FastAPI App Structure
+#### 4.2.1 Autonomous AI Engine
+Sistem, `Gemini 2.5 Flash` modelini kullanarak sismik verileri analiz eder. Mag < 4.0 durumunda AI bypass edilerek sismolojik kurallar devreye girer.
 
-```python
-# main.py
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup: Initialize DB, load AI model, start sync worker
-    await init_database()
-    await init_ai_engine()
-    start_background_tasks()
-    
-    yield
-    
-    # Shutdown: Close connections, save state
-    await close_database()
-    await shutdown_websockets()
-
-app = FastAPI(lifespan=lifespan)
-
-# CORS for local network
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # LAN only, no internet
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
-# WebSocket manager
-from managers.websocket import ConnectionManager
-ws_manager = ConnectionManager()
-
-@app.websocket("/ws/{device_id}")
-async def websocket_endpoint(websocket: WebSocket, device_id: str):
-    await ws_manager.connect(websocket, device_id)
-    try:
-        while True:
-            data = await websocket.receive_json()
-            await handle_device_message(device_id, data)
-    except WebSocketDisconnect:
-        ws_manager.disconnect(device_id)
-```
+---
 
 ### 4.3 Database Stack
 
@@ -1166,337 +1111,63 @@ class WebSocketManager {
     this.socket.on('task_update', async (task) => {
       await db.tasks.update(task.id, task);
     });
-  }
-  
-  async performFullSync() {
-    // 1. Push local changes
-    const localChanges = await db.syncQueue
-      .where('synced').equals(false)
-      .toArray();
-    
-    if (localChanges.length > 0) {
-      this.socket.emit('sync_request', {
-        pending_changes: localChanges.map(c => ({
-          entity: c.collection,
-          id: c.data.id,
-          operation: c.operation,
-          data: c.data
-        }))
-      });
-    }
-    
-    // 2. Pull server updates
-    const lastSyncTime = await db.settings.get('last_sync_timestamp');
-    this.socket.emit('pull_updates', {
-      since: lastSyncTime || 0
-    });
-  }
-  
-  async handleSyncResponse(data) {
-    const { changes, conflicts } = data;
-    
-    // Apply changes
-    for (const change of changes) {
-      switch (change.entity) {
-        case 'task':
-          if (change.operation === 'create') {
-            await db.tasks.add(change.data);
-          } else if (change.operation === 'update') {
-            await db.tasks.update(change.data.id, change.data);
-          }
-          break;
-      }
-    }
-    
-    // Handle conflicts (if any)
-    if (conflicts.length > 0) {
-      await this.resolveConflicts(conflicts);
-    }
-    
-    // Update last sync timestamp
-    await db.settings.put({
-      key: 'last_sync_timestamp',
-      value: Date.now()
-    });
-  }
-  
-  async resolveConflicts(conflicts) {
-    // Simple strategy: server wins for now
-    // TODO: Implement more sophisticated conflict resolution
-    for (const conflict of conflicts) {
-      await db.tasks.update(conflict.id, conflict.server_data);
-    }
-  }
-  
-  notifyNewTask(task) {
-    // Browser notification if supported
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Yeni Görev!', {
-        body: `${task.priority} öncelikli görev: ${task.address}`,
-        icon: '/icon-192x192.png'
-      });
-    }
-    
-    // Also vibrate if supported (mobile)
-    if ('vibrate' in navigator) {
-      navigator.vibrate([200, 100, 200]);
-    }
-  }
-  
-  disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-    }
+  }    }
   }
 }
 
 export const wsManager = new WebSocketManager();
 ```
 
-### 8.3 Conflict Resolution Strategy
+### 8.3 Conflict Resolution Strategy (Final)
 
-```javascript
-// src/utils/conflictResolver.js
+Sistem, offline cihazlardan gelen verileri senkronize ederken şu iki stratejiyi sırasıyla uygular:
 
-export function resolveTaskConflict(localTask, serverTask) {
-  // Strategy 1: Timestamp comparison
-  const localTime = localTask.local_updated_at || localTask.updated_at;
-  const serverTime = serverTask.updated_at;
-  
-  if (localTime > serverTime) {
-    // Local is newer → local wins
-    return {
-      winner: 'local',
-      data: localTask
-    };
-  } else if (serverTime > localTime) {
-    // Server is newer → server wins
-    return {
-      winner: 'server',
-      data: serverTask
-    };
-  }
-  
-  // Strategy 2: Status priority (if timestamps are equal)
-  const statusPriority = {
-    'resolved': 5,
-    'needs_backup': 4,
-    'false_alarm': 4,
-    'in_progress': 3,
-    'assigned': 2,
-    'pending': 1
-  };
-  
-  const localPriority = statusPriority[localTask.status] || 0;
-  const serverPriority = statusPriority[serverTask.status] || 0;
-  
-  if (localPriority > serverPriority) {
-    return { winner: 'local', data: localTask };
-  } else if (serverPriority > localPriority) {
-    return { winner: 'server', data: serverTask };
-  }
-  
-  // Strategy 3: Manual review needed
-  return {
-    winner: 'conflict',
-    data: null,
-    requiresManualReview: true,
-    localData: localTask,
-    serverData: serverTask
-  };
-}
-```
+#### Strateji 1: Timestamp Comparison (Zaman Damgası)
+En son güncellenen veri (`local_updated_at` vs `server_updated_at`) her zaman kazanır. Bu, saha ekiplerinin en güncel saha bilgisinin Master Node'a güvenle aktarılmasını sağlar.
+
+#### Strateji 2: Status Priority (Durum Önceliği)
+Zaman damgaları eşitse veya çakışıyorsa, görev durumu hiyerarşisi devreye girer:
+`resolved` (5) > `needs_backup` / `false_alarm` (4) > `in_progress` (3) > `assigned` (2) > `pending` (1).
 
 ---
 
 ## 9. AI Entegrasyonu ve Önceliklendirme Algoritması
 
-### 9.1 Gemini AI Service
+### 9.1 Gemini 2.5 Flash Engine
 
-```python
-# backend/services/ai_engine.py
-import google.generativeai as genai
-from typing import List, Dict
-import json
+Sistem, `Gemini 2.5 Flash` modelini `application/json` modunda kullanarak tam yapılandırılmış (structured) çıktılar üretir.
 
-class AIEngine:
-    def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
-    
-    async def analyze_earthquake_data(self, earthquake_data: Dict) -> List[Dict]:
-        """
-        Deprem verisini analiz eder ve bölgeleri önceliklendirir.
-        
-        Args:
-            earthquake_data: {
-                'magnitude': 7.8,
-                'epicenter': {'lat': 38.0, 'lng': 37.0},
-                'depth_km': 10,
-                'affected_regions': [
-                    {
-                        'name': 'Bornova',
-                        'population': 450000,
-                        'building_count': 85000,
-                        'old_building_ratio': 0.65,
-                        'distance_to_epicenter_km': 45
-                    }
-                ]
-            }
-        
-        Returns:
-            List of zones with priority scores
-        """
-        
-        prompt = f"""
-Sen bir afet yönetim yapay zekasısın. Aşağıdaki deprem verisine göre 
-bölgeleri önceliklendir ve her birine 1.0-5.0 arası risk skoru ver.
+#### 9.1.1 Phase 4: Low-Magnitude Proxy Bypass
+Deprem büyüklüğü **4.0** şiddetinin altındaysa, AI motoru token tasarrufu ve halüsinasyon riskini önlemek için bypass edilir. Sistem otomatik olarak:
+- **Priority:** DÜŞÜK
+- **Tasks:** 1x Gözlem (Observation)
+- **Zone:** Episantr merkezli 2km yarıçaplı kare poligon oluşturur.
 
-Deprem Bilgisi:
-- Büyüklük: {earthquake_data['magnitude']}
-- Derinlik: {earthquake_data['depth_km']} km
-- Episantr: {earthquake_data['epicenter']}
+#### 9.1.2 Phase 6: Seismological Heuristics
+AI analizinde sismolojik doğruluk için şu formüller prompt seviyesinde entegre edilmiştir:
+- **Impact Radius:** Derinlik ve büyüklüğe bağlı sismik etki yarıçapı hesaplaması.
+- **Rupture Length:** `10^(0.69 * M - 3.22)` formülü ile fay kırılma uzunluğu tahmini.
+- **Organic Polygons:** Gemini, eliptik ve asimetrik "Damage Contours" (hasar konturları) üreterek gerçekçi bölge haritaları çizer.
 
-Bölgeler:
-{json.dumps(earthquake_data['affected_regions'], indent=2, ensure_ascii=False)}
+### 9.2 Autonomous AI Triage Loop (Phase 5)
 
-Önceliklendirme Kriterleri:
-1. Episantra yakınlık (0-30 km = kritik)
-2. Eski bina oranı (>50% = yüksek risk)
-3. Nüfus yoğunluğu (>100k = öncelikli)
-4. Deprem büyüklüğü ile mesafe korelasyonu
+Backend, otonom bir döngü (`_autonomous_triage_loop`) üzerinden çalışır:
+1. **Polling:** 60 saniyede bir Kandilli/AFAD API verileri kontrol edilir.
+2. **Detection:** Yeni bir deprem tespit edildiğinde AI analizi tetiklenir.
+3. **Auto-Generation:** Bölgeler ve görevler veritabanında otonom oluşturulur.
+5. **Emergency Alert:** M6.0 ve üzeri depremlerde tüm sisteme `KIRMIZI ALARM` yayını yapılır.
 
-JSON formatında döndür:
-{{
-  "zones": [
-    {{
-      "name": "Bölge Adı",
-      "priority_score": 4.8,
-      "reasoning": "Episantra 12km, eski bina oranı %75",
-      "estimated_casualties": 150,
-      "recommended_team_count": 5
-    }}
-  ]
-}}
-"""
-        
-        response = await self.model.generate_content_async(prompt)
-        result = json.loads(response.text)
-        return result['zones']
-    
-    async def prioritize_building(self, building_data: Dict) -> float:
-        """
-        Tek bir binayı önceliklendir.
-        
-        Args:
-            building_data: {
-                'address': 'Bornova 3. Sokak No:15',
-                'building_age': 45,
-                'floors': 5,
-                'building_type': 'residential',
-                'proximity_to_epicenter_km': 12,
-                'soil_type': 'soft',  # soft, medium, hard
-                'reported_damage': 'moderate'  # minor, moderate, severe, collapsed
-            }
-        
-        Returns:
-            Priority score (1.0 - 5.0)
-        """
-        
-        # Basit kural tabanlı sistem (AI olmadan hızlı hesaplama için)
-        score = 1.0
-        
-        # Mesafe skoru
-        if building_data['proximity_to_epicenter_km'] < 10:
-            score += 2.0
-        elif building_data['proximity_to_epicenter_km'] < 30:
-            score += 1.5
-        elif building_data['proximity_to_epicenter_km'] < 50:
-            score += 1.0
-        
-        # Bina yaşı skoru
-        if building_data['building_age'] > 50:
-            score += 1.5
-        elif building_data['building_age'] > 30:
-            score += 1.0
-        
-        # Hasar raporu skoru
-        damage_scores = {
-            'collapsed': 5.0,
-            'severe': 4.0,
-            'moderate': 2.5,
-            'minor': 1.0
-        }
-        score = max(score, damage_scores.get(building_data['reported_damage'], 1.0))
-        
-        # Zemin tipi çarpanı
-        soil_multipliers = {
-            'soft': 1.3,
-            'medium': 1.1,
-            'hard': 1.0
-        }
-        score *= soil_multipliers.get(building_data['soil_type'], 1.0)
-        
-        # 1.0-5.0 aralığına normalize et
-        return min(5.0, max(1.0, score))
-```
+### 9.3 Task Generation Constraints
 
-### 9.2 Task Generation from AI Analysis
-
-```python
-# backend/services/task_generator.py
-from models import Zone, Task
-from database import db_session
-from datetime import datetime
-
-class TaskGenerator:
-    def __init__(self, ai_engine):
-        self.ai_engine = ai_engine
-    
-    async def generate_tasks_from_zones(self, zones: List[Dict]):
-        """
-        AI analiz sonuçlarından görev listesi oluşturur.
-        """
-        tasks = []
-        
-        for zone_data in zones:
-            # Zone kaydı oluştur
-            zone = Zone(
-                name=zone_data['name'],
-                priority_score=zone_data['priority_score'],
-                estimated_casualties=zone_data.get('estimated_casualties', 0),
-                geometry=zone_data.get('geometry', {}),
-                created_at=datetime.utcnow()
-            )
-            db_session.add(zone)
-            db_session.flush()  # ID almak için
-            
-            # Her bölge için birden fazla görev oluştur
-            task_count = zone_data.get('recommended_team_count', 3)
-            
-            for i in range(task_count):
-                # Bölge içinde rastgele koordinat oluştur
-                # (Gerçek uygulamada bina veritabanından çekilecek)
-                task = Task(
-                    zone_id=zone.id,
-                    priority='RED' if zone.priority_score >= 4.0 else
-                           'YELLOW' if zone.priority_score >= 2.5 else 'GREEN',
-                    status='pending',
-                    lat=zone_data.get('center_lat'),
-                    lng=zone_data.get('center_lng'),
-                    address=f"{zone.name} - Görev {i+1}",
-                    created_at=datetime.utcnow()
-                )
-                tasks.append(task)
-                db_session.add(task)
-        
-        db_session.commit()
-        return tasks
-```
+Sistem kararlılığı için AI çıktısı şu kısıtlamalara tabidir:
+- **Zone Limit:** Her olay için tam olarak **1** ana bölge.
+- **Task Limit:** Bölge başına maksimum **3** kritik görev.
+- **Priority Scale:** Sadece "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK" etiketleri kullanılır.
 
 ---
 
 ## 10. Güvenlik ve Hata Yönetimi
+
 
 ### 10.1 Authentication & Authorization
 
@@ -1822,160 +1493,59 @@ triage-v2/
 
 ---
 
-### PHASE 3: AI & Advanced Features (Sprint 6-7, 2 hafta)
+---
 
-#### Sprint 3.1: AI Integration
-- [X] Gemini API integration
-- [X] Zone prioritization algorithm
-- [X] Task generation from AI analysis
-- [X] AFAD API client (mock)
+## 11. Proje Klasör Yapısı
 
-**Çıktı:** AI analiz sistemi çalışıyor ✅
-
-#### Sprint 3.2: Dynamic Task Assignment
-- [X] Auto task assignment logic
-- [X] Task reassignment on cancel
-- [X] Backup request workflow
-- [X] Team status management
-
-**Çıktı:** Dinamik görev dağılımı aktif ✅
+```bash
+ebhack-26-dev-gaes/
+├── backend/
+│   ├── main.py              # FastAPI Entry Point (Autonomous Loop)
+│   ├── services/
+│   │   ├── ai_engine.py      # Gemini 2.5 Flash Logic
+│   │   ├── dispatcher.py    # Auto-Assignment Engine
+│   │   └── sync_service.py  # Conflict Resolution
+│   ├── routes/
+│   │   ├── emergency.py     # QR & Alerts
+│   │   └── tasks.py         # Task API
+│   └── models/              # SQLite Schemas
+├── frontend/
+│   ├── admin/               # Komuta Merkezi (Cyber-Baroque UI)
+│   └── field/               # Saha Uygulaması (Offline PWA)
+└── docs/                    # Teknik dokümanlar
+```
 
 ---
 
-### PHASE 4: State, Offline DB ve WebSocket Entegrasyonu (Sprint 8-9, 2 hafta)
+## 12. Geliştirme Aşamaları ve Roadmap
 
-> **[DEPRECATED] Eski yaklaşım:** HTML şablonlarını React komponentlerine çevirme.
-> **Yeni yaklaşım:** Mevcut React+TS komponentlerine state management, offline DB ve WebSocket katmanlarını bağlama.
+### PHASE 1-6: CORE SYSTEM [COMPLETED]
+- [X] Offline-First Foundation
+- [X] AI Prioritization (Gemini)
+- [X] WebSocket Sync
+- [X] Cyber-Baroque UI System
+- [X] Autonomous Triage Loop
 
-#### Sprint 4.1: Admin (Komuta) App Wiring
-- [X] Zustand store entegrasyonu (taskStore, teamStore, syncStore)
-- [X] REST API client servisi (api.ts)
-- [X] WebSocket client servisi (websocket.ts)
-- [X] MapPanel → canlı task/team verisi bağlama
-- [X] CommandSidePanel → API-driven ekip yönetimi
-- [X] IntelligenceLogPanel → gerçek sistem event’leri
-
-#### Sprint 4.2: Field (Saha) App Wiring
-- [X] Dexie.js offline DB şemasını backend şemasıyla hizalama
-- [X] Sync queue servisi (syncQueue.ts)
-- [X] WebSocket client servisi (websocket.ts)
-- [X] SwipeButton aksiyonları → offline-first task status update
-- [X] TaskMap → canlı görev koordinatları
-- [X] StatusBar → gerçek bağlantı durumu ve sync status
-
-**Çıktı:** Her iki frontend uygulaması backend API’ye bağlı ve offline-first çalışıyor ✅
-
-#### Sprint 4.3: Gerçek Zamanlı Veri ve Aksiyon Entegrasyonu (Purge Mock Data & Core Wiring)
-- [x] `App.tsx` içerisindeki mock veriler (`DEMO_UNITS`, `DEMO_ZONES`) temizlenecek, API'den gerçek state beslemesi (initial hydration) yapılacak.
-- [x] `MapPanel.tsx`'te `react-leaflet-draw` ile Bölge Çizme (POST `/api/v1/zones`) entegrasyonu.
-- [x] `MapPanel.tsx`'te Öncelik Ezme aracı ile döngüsel (RED->YELLOW->GREEN) PATCH isteği atılması ve WS broadcast tetiklenmesi.
-- [x] `CommandSidePanel.tsx` veya `MapPanel.tsx` üzerinden Manuel Ekip Atama işlemlerinin backend ile entegrasyonu.
-- [x] `syncQueue.ts`'nin Zone koleksiyonu işlemlerini kuyruklaması ve senkronize etmesi.
-- [x] Backend `zones.py` rotalarının WS `ZONE_UPDATE` broadcast olayını tetiklemesi.
-- [x] Fix Map Pointer-Events & Move Draw Controls to Top-Right.
-- [x] Implement WebSocket TEAM_PRESENCE handshake.
-- [x] Hotfix: Map Navigation & Leaflet Draw CSS Integration
-- [x] Feature: Mobile Dynamic IP Config Storage
-- [x] Hotfix: Admin UI Real-time Presence Sync
-- [x] Feature: Custom Integrated Draw Toolbar UI
-- [x] Hotfix: SQLite DB Team Seeding & Schema Sync
-- [x] Feature: Native React Draw Control Sub-Panel Under PEN Button
-- [x] Architecture Pivot: Dynamic Device Auto-Registration (No hardcoded teams)
-- [x] Hotfix: Rebind Leaflet L.Draw.Event.CREATED to REST API post
-- [x] Hotfix: Admin UI Data Fetching, Base URL, and CORS strict alignment
-
+### PHASE 7: ADVANCED RESILIENCE & P2P [FINAL STATE]
+- [X] **Phase 6:** Seismological Heuristics (Rupture Length)
+- [X] **Phase 5:** Autonomous Emergency Broadcasts
+- [X] **QR Handoff:** İnternetsiz ortamda toplu görev paylaşımı.
 
 ---
 
-### PHASE 5: Testing & Optimization (Sprint 10, 1 hafta)
+## 13. P2P QR Networking (Proportional Split)
 
-#### Sprint 5.1: Testing
-- [X] Unit tests (backend services)
-- [X] Integration tests (API endpoints)
-- [X] E2E tests (critical user flows)
-- [X] Offline scenario testing
-- [X] WebSocket stress testing
+İnternetin tamamen koptuğu ve cihazların Master Node'a ulaşamadığı senaryolarda, ekipler arası iş yükü dengelemesi QR kodları üzerinden gerçekleşir.
 
-#### Sprint 5.2: Performance Optimization
-- [X] Database query optimization
-- [X] Frontend bundle size reduction
-- [X] Service Worker caching strategy
-- [X] WebSocket message batching
-- [X] Map tile preloading
-
-**Çıktı:** Sistem production-ready ✅
+### 13.1 Handoff Algoritması (50/50 Split)
+Bir ekip elindeki görevleri başka bir ekiple paylaşmak istediğinde:
+1. **Grouping:** Görevler önceliklerine göre (RED, YELLOW, GREEN) gruplanır.
+2. **Splitting:** Her gruptaki görevlerin yarısı (`Math.floor(count / 2)`) aktarılacak havuza eklenir.
+3. **Payload:** Görev verileri minifiye edilmiş JSON formatına (`i: id, p: priority, la: lat...`) dönüştürülür.
+4. **QR Generation:** Veri bir QR koda basılır.
+5. **Confirmation:** Alıcı QR'ı okuttuğunda, verici kendi lokalinden bu görevleri siler ve 'Delegated' olarak işaretler.
 
 ---
-
-### PHASE 6: Deployment & Training (Sprint 11, 1 hafta)
-
-#### Sprint 6.1: Deployment (Bare-Metal)
-- [X] ~~Docker containerization~~ [DEPRECATED]
-- [X] systemd service dosyaları (triage-backend.service)
-- [X] Nginx konfigürasyonu (admin + field + API proxy)
-- [X] Bare-metal deployment script (scripts/setup_server.sh)
-- [X] WiFi hotspot configuration guide
-- [X] System monitoring setup
-
-#### Sprint 6.2: Documentation & Training
-- [X] User manual (Türkçe)
-- [X] Admin training materials
-- [X] Field worker quick guide
-- [X] Troubleshooting guide
-
-**Çıktı:** Sistem deploy edildi, kullanıcılar eğitildi ✅
-
----
-
-## 13. Frontend Entegrasyon Planı (Güncellenmiş)
-
-> **[DEPRECATED] Eski yaklaşım:** `frontend_sablon_tasarim` klasöründeki HTML şablonları JSX'e çevirme.
-> **Yeni yaklaşım:** Mevcut Vite+React+TypeScript uygulamaları `frontend/admin` ve `frontend/field` olarak taşınacak ve backend servislerine bağlanacak.
-
-### 13.1 Mevcut Şablon Gerçekliği
-
-| Şablon | Kaynak | Hedef | Durum |
-|--------|--------|-------|-------|
-| **komuta** | `frontend_sablon_tasarim/komuta/` | `frontend/admin/` | Tam React+TS uygulaması, UI hazır |
-| **mobil** | `frontend_sablon_tasarim/mobil/` | `frontend/field/` | Tam React+TS PWA, Dexie.js entegre |
-
-### 13.2 Entegrasyon Workflow (Yeni)
-
-Mevcut Komponent Analizi
-↓
-Mevcut React komponentlerini incele
-Prop interface'lerini belirle
-Mock veri kaynaklarını tespit et
-
-Servis Katmanı Ekleme
-↓
-api.ts (REST client)
-websocket.ts (WS client)
-syncQueue.ts (offline sync)
-
-Store Katmanı Ekleme
-↓
-Zustand stores oluştur
-Mock data → store data geçişi
-Optimistic UI pattern uygula
-
-Komponent Wiring
-↓
-Komponentleri store'lara bağla
-API call'ları entegre et
-Offline fallback ekle
-
-### 13.3 Entegrasyon Checklist (Her uygulama için)
-
-- [X] Uygulama `frontend/` altına taşındı
-- [X] API client servisi eklendi (api.ts)
-- [X] WebSocket client servisi eklendi (websocket.ts)
-- [X] Zustand store'lar oluşturuldu
-- [X] Mock data → API/store verisi geçişi yapıldı
-- [X] Offline-first sync queue entegre edildi
-- [X] Error handling eklendi
-- [X] Connection status göstergesi bağlandı
-- [X] Offline mode test edildi
 
 
 ---
