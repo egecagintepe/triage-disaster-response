@@ -27,7 +27,7 @@
 
 @layer base {
   body {
-    @apply bg-black text-gray-50 font-sans overflow-hidden antialiased;
+    @apply bg-black text-gray-50 font-sans tracking-tight overflow-hidden antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

@@ -18,6 +18,12 @@ const PRIORITY_COLORS: Record<string, string> = {
   GREEN: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
 };
 
+const MOCK_KANDILLI = [
+  { id: 1, loc: "İzmir - Buca", mag: 6.8, depth: 12.4, time: "11:42", lat: 38.38, lng: 27.16 },
+  { id: 2, loc: "Ege Denizi", mag: 4.2, depth: 8.1, time: "11:30", lat: 38.5, lng: 26.8 },
+  { id: 3, loc: "Manisa - Akhisar", mag: 3.5, depth: 5.0, time: "10:15", lat: 38.92, lng: 27.84 },
+];
+
 const STATUS_LABELS: Record<string, string> = {
   pending: "Bekliyor",
   assigned: "Atandı",
@@ -84,22 +90,14 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
   return (
     <>
-      <button 
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-[1002] bg-zinc-950 border-y border-r border-white/10 p-2 rounded-r-lg hover:bg-zinc-900 transition-colors"
+      <motion.div 
+        initial={false}
+        animate={{ x: isCollapsed ? -344 : 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="absolute left-0 top-6 bottom-6 flex items-center z-[1001] pointer-events-none"
       >
-        {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronLeft className="h-4 w-4 text-gray-400" />}
-      </button>
+        <div className="w-80 h-full ml-6 glass-panel flex flex-col pointer-events-auto border-white/[0.04]">
 
-      <AnimatePresence>
-        {!isCollapsed && (
-          <motion.div 
-            initial={{ x: -400 }}
-            animate={{ x: 0 }}
-            exit={{ x: -400 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute left-6 top-6 bottom-6 w-80 glass-panel flex flex-col pointer-events-auto border-white/[0.04] z-[1001]"
-          >
       {/* SECTION: INTEGRATED TOOLBAR */}
       <div className="p-3 border-b border-white/[0.06] bg-white/[0.01] flex justify-between items-center gap-2">
         <div className="flex gap-2">
@@ -128,28 +126,57 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
         </div>
       </div>
 
-      {/* PEN SUB-PANEL */}
-      {mode === "PEN" && (
-        <div className="p-3 border-b border-white/[0.06] bg-blue-500/10 flex gap-2">
-          <button
-            onClick={() => {
-              if (map) {
-                // @ts-ignore
-                new L.Draw.Polygon(map).enable();
-              }
-            }}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-2 rounded transition-colors"
-          >
-            BÖLGE ÇİZİMİ BAŞLAT
-          </button>
-          <button
-            onClick={() => {
-              setMode("CURSOR");
-            }}
-            className="flex-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 text-[10px] font-bold py-2 rounded transition-colors"
-          >
-            İPTAL ET
-          </button>
+      {/* CONTEXT SUB-PANEL */}
+      {(mode === "PEN" || mode === "OVERRIDE") && (
+        <div className="p-3 border-b border-white/[0.06] bg-black/40">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">KANDİLLİ_CANLI_VERİ</span>
+            <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+          </div>
+          <div className="space-y-1 mb-3">
+            {MOCK_KANDILLI.map((q) => (
+              <button
+                key={q.id}
+                onClick={() => map?.flyTo([q.lat, q.lng], 12, { animate: true, duration: 1 })}
+                className="w-full text-left p-2 rounded bg-white/5 hover:bg-white/10 border border-white/5 transition-colors flex justify-between items-center"
+              >
+                <div>
+                  <p className="text-white text-[11px] font-bold">{q.loc}</p>
+                  <p className="text-gray-500 text-[9px] font-mono">{q.time} | D:{q.depth}km</p>
+                </div>
+                <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${q.mag >= 6 ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"}`}>
+                  {q.mag} M
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {mode === "PEN" && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (map) {
+                    // @ts-ignore
+                    new L.Draw.Polygon(map).enable();
+                  }
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-2 rounded transition-colors"
+              >
+                BÖLGE ÇİZİMİ BAŞLAT
+              </button>
+              <button
+                onClick={() => setMode("CURSOR")}
+                className="bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 text-[10px] font-bold px-3 rounded transition-colors"
+              >
+                İPTAL
+              </button>
+            </div>
+          )}
+          {mode === "OVERRIDE" && (
+            <div className="text-[10px] text-amber-400 text-center font-mono opacity-80 mt-1">
+              HARİTADAN BÖLGE VEYA GÖREV SEÇİN
+            </div>
+          )}
         </div>
       )}
 
@@ -362,9 +389,15 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
            {[1,2,3,4,5].map(i => <div key={i} className={`w-0.5 h-3 ${i < 4 ? "bg-blue-500" : "bg-white/10"} rounded-full`} />)}
         </div>
       </footer>
-    </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+        
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="pointer-events-auto bg-zinc-950 border-y border-r border-white/10 p-2 rounded-r-lg hover:bg-zinc-900 transition-colors shadow-lg"
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronLeft className="h-4 w-4 text-gray-400" />}
+        </button>
+      </motion.div>
     </>
   );
 }

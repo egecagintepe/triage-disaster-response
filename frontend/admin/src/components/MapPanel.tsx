@@ -11,6 +11,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode } from "../types";
 import type { Task } from "../services/localDb";
+import { db } from "../services/localDb";
 import { api } from "../services/api";
 import CommandSidePanel from "./CommandSidePanel";
 
@@ -110,6 +111,12 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
             priority_score: 3.5, 
             geometry: geojson
           });
+          
+          // Log manual override
+          window.dispatchEvent(new CustomEvent('map_action_log', { 
+            detail: { action: "Yeni Risk Bölgesi İşaretlendi", entity: "[MANUAL_OVERRIDE]", type: LogType.SYSTEM } 
+          }));
+          
           // Remove manual layer, let WebSocket update trigger React render
           map.removeLayer(layer);
         } catch (err) {
@@ -144,6 +151,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
     } else if (toolMode === "ERASER") {
       try {
         await api.delete(`/api/v1/zones/${zone.id}`);
+        await db.zones.delete(zone.id);
       } catch (e) {
         console.error("Zone deletion failed", e);
       }

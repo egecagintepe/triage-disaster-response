@@ -41,6 +41,8 @@ export default function App() {
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sirenIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const deviceName = localStorage.getItem('device_name') || 'FIELD-UNKNOWN';
 
@@ -107,18 +109,57 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
-  // --- Emergency alert listener ---
+  // --- Emergency alert listener + AudioContext Siren ---
   useEffect(() => {
+    const playSiren = () => {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      if (sirenIntervalRef.current) clearInterval(sirenIntervalRef.current);
+      
+      let high = true;
+      sirenIntervalRef.current = setInterval(() => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(high ? 800 : 600, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime); // LOUD but not deafening
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+        high = !high;
+      }, 500);
+    };
+
+    const stopSiren = () => {
+      if (sirenIntervalRef.current) clearInterval(sirenIntervalRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
+    };
+
     const handleAlert = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       setEmergencyAlert({ message: detail.message, severity: detail.severity });
+      playSiren();
     };
-    const handleClear = () => setEmergencyAlert(null);
+    
+    const handleClear = () => {
+      setEmergencyAlert(null);
+      stopSiren();
+    };
+
     window.addEventListener('emergency_alert', handleAlert);
     window.addEventListener('emergency_clear', handleClear);
     return () => {
       window.removeEventListener('emergency_alert', handleAlert);
       window.removeEventListener('emergency_clear', handleClear);
+      stopSiren();
     };
   }, []);
 

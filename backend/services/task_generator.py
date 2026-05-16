@@ -76,22 +76,32 @@ async def generate_from_analysis(
         zone_lng = zone_analysis.get("lng") or region.get("lng", epicenter_lng + random.uniform(-0.05, 0.05))
         radius_m = zone_analysis.get("radius_m", 500)
 
-        import math as _math
-        hex_radius = radius_m / 111000.0  # Approx meters to degrees
-        hex_points = []
-        for angle_i in range(6):
-            angle_rad = _math.radians(60 * angle_i - 30)
-            hex_lat = zone_lat + hex_radius * _math.cos(angle_rad)
-            hex_lng = zone_lng + hex_radius * _math.sin(angle_rad) / _math.cos(_math.radians(zone_lat))
-            hex_points.append([hex_lng, hex_lat])
-        hex_points.append(hex_points[0])
+        polygon_coords_raw = zone_analysis.get("polygon_coordinates")
+
+        # Fallback to hexagon if AI didn't provide coordinates
+        if not polygon_coords_raw or not isinstance(polygon_coords_raw, list) or len(polygon_coords_raw) < 3:
+            import math as _math
+            hex_radius = radius_m / 111000.0  # Approx meters to degrees
+            polygon_coords = []
+            for angle_i in range(6):
+                angle_rad = _math.radians(60 * angle_i - 30)
+                hex_lat = zone_lat + hex_radius * _math.cos(angle_rad)
+                hex_lng = zone_lng + hex_radius * _math.sin(angle_rad) / _math.cos(_math.radians(zone_lat))
+                polygon_coords.append([hex_lng, hex_lat]) # GeoJSON is [lng, lat]
+            polygon_coords.append(polygon_coords[0])
+        else:
+            # AI gives [lat, lng], swap to [lng, lat] for GeoJSON
+            polygon_coords = [[p[1], p[0]] for p in polygon_coords_raw]
+            # Ensure it's closed
+            if polygon_coords[0] != polygon_coords[-1]:
+                polygon_coords.append(polygon_coords[0])
 
         zone = Zone(
             name=zone_name,
             priority_score=score,
             geometry={
                 "type": "Polygon",
-                "coordinates": [hex_points],
+                "coordinates": [polygon_coords],
             },
             estimated_casualties=estimated_casualties,
             building_density=region.get("building_count", int(region.get("population_density", 5000) * 0.3)),

@@ -28,7 +28,10 @@ export default function IntelligenceLogPanel({ logs }: Props) {
   const tasks = useTaskStore((s) => s.tasks);
   const pendingAiTasks = tasks.filter((t) => t.status === "pending_approval");
 
+  const updateTask = useTaskStore((s) => s.updateTask);
+
   const handleApprove = async (taskId: number) => {
+    updateTask({ id: taskId, status: "pending" });
     await updateTaskLocal(taskId, { status: "pending" });
   };
 
@@ -114,31 +117,42 @@ export default function IntelligenceLogPanel({ logs }: Props) {
               AI Görev Onayı Bekliyor ({pendingAiTasks.length})
             </div>
             <AnimatePresence>
-              {pendingAiTasks.map((task) => (
+              {pendingAiTasks.map((task) => {
+                const isRed = task.priority === "RED" || task.priority === "CRITICAL";
+                const isYellow = task.priority === "YELLOW" || task.priority === "HIGH";
+                
+                const borderColor = isRed ? "border-red-500/50" : isYellow ? "border-amber-500/50" : "border-emerald-500/50";
+                const bgColor = isRed ? "bg-red-950/20" : isYellow ? "bg-amber-950/20" : "bg-emerald-950/20";
+                const glowColor = isRed ? "shadow-[0_0_15px_rgba(239,68,68,0.15)]" : isYellow ? "shadow-[0_0_15px_rgba(245,158,11,0.15)]" : "shadow-[0_0_15px_rgba(16,185,129,0.15)]";
+                const accentColor = isRed ? "bg-red-500" : isYellow ? "bg-amber-500" : "bg-emerald-500";
+                const textPriority = isRed ? "text-red-400" : isYellow ? "text-amber-400" : "text-emerald-400";
+                
+                return (
                 <motion.div
                   key={`ai-task-${task.id}`}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 relative overflow-hidden"
+                  className={`${bgColor} border ${borderColor} ${glowColor} rounded-md p-3 relative overflow-hidden`}
                 >
-                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+                  <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`} />
                   <div className="flex justify-between items-start pl-2">
                     <div>
-                      <p className="text-white text-sm font-bold">{task.address}</p>
-                      <p className="text-blue-200 text-xs mt-1">Öncelik: {task.priority}</p>
-                      <p className="text-gray-400 text-[10px] mt-1 italic">{task.notes}</p>
+                      <p className="text-white text-[13px] font-semibold">{task.address}</p>
+                      <p className={`${textPriority} text-[10px] font-bold mt-1 uppercase tracking-wider`}>ÖNCELİK: {task.priority}</p>
+                      <p className="text-gray-400 text-[10px] mt-1.5 italic leading-tight">{task.notes}</p>
                     </div>
                     <button
                       onClick={() => handleApprove(task.id)}
-                      className="bg-blue-600 hover:bg-blue-500 text-white rounded p-1.5 transition-colors"
+                      className="bg-blue-600/20 hover:bg-blue-500 border border-blue-500/50 text-blue-400 hover:text-white rounded p-1.5 transition-all ml-3 shrink-0"
                       title="Görevi Onayla ve Sahaya Aktar"
                     >
                       <CheckCircle2 className="h-4 w-4" />
                     </button>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </AnimatePresence>
           </div>
         )}

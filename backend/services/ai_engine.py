@@ -156,10 +156,18 @@ ZONE_ANALYSIS_SCHEMA = {
                     "estimated_casualties": {"type": "integer"},
                     "recommended_team_count": {"type": "integer"},
                     "risk_factors": {"type": "string"},
+                    "polygon_coordinates": {
+                        "type": "array",
+                        "description": "Array of [lat, lng] representing an irregular, organic, elliptical polygon showing realistic seismic damage contour.",
+                        "items": {
+                            "type": "array",
+                            "items": {"type": "number"}
+                        }
+                    }
                 },
                 "required": [
                     "name", "lat", "lng", "radius_m", "risk_level",
-                    "priority_score", "estimated_casualties", "recommended_team_count", "risk_factors"
+                    "priority_score", "estimated_casualties", "recommended_team_count", "risk_factors", "polygon_coordinates"
                 ],
             },
         },
@@ -249,7 +257,11 @@ DEPREM VERİLERİ:
 BÖLGE VERİLERİ:
 {json.dumps(regions, ensure_ascii=False, indent=2)}
 
-GÖREVİN:
+GÖREV:
+Yukarıdaki sismik verilere ve {impact_radius_km} km etki yarıçapına (R = e^(0.8 * M) / depth) dayanarak bir risk analizi yap.
+ÖNEMLİ COĞRAFİ KURAL: 'polygon_coordinates' için asla kare veya düzgün altıgen çizmeyin! Sismik dalga yayılımını ve gerçek coğrafyayı taklit eden, merkez üssü etrafında en az 6-8 noktadan oluşan, asimetrik, eliptik veya organik çokgen koordinatları ([lat, lng] formatında) üretin.
+
+Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
 1. 'zones' dizisini oluştur: Her bölge için episantr mesafesi ve etki yarıçapını kıyaslayarak risk seviyesi (risk_level), öncelik (priority_score: 1.0-5.0), tahmini kayıp (estimated_casualties) ve merkez koordinatlarını (lat, lng) belirle.
 2. 'tasks' dizisini oluştur: Bu bölgelerde yapılması gereken "arama_kurtarma", "hasar_tespit", "lojistik" gibi spesifik görevleri listele.
 3. Genel analiz için 'confidence_score' ve 'reasoning' (1-2 cümle) ekle.

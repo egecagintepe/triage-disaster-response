@@ -195,7 +195,7 @@ export default function App() {
     };
   }, [addLog, isAuthenticated]);
 
-  // --- Log network status changes ---
+  // --- Log network status changes & map events ---
   useEffect(() => {
     if (!isAuthenticated) return;
     if (isOnline) {
@@ -203,6 +203,12 @@ export default function App() {
     } else {
       addLog("NETWORK", "BAĞLANTI_KESİLDİ — ÇEVRİMDIŞI_MOD", LogType.CRITICAL);
     }
+
+    const handleMapLog = (e: any) => {
+      addLog(e.detail.entity, e.detail.action, e.detail.type);
+    };
+    window.addEventListener("map_action_log", handleMapLog);
+    return () => window.removeEventListener("map_action_log", handleMapLog);
   }, [isOnline, addLog, isAuthenticated]);
 
   // --- Log task store changes ---

@@ -62,17 +62,20 @@ async def clear_emergency():
 
 
 @router.get("/qr")
-async def generate_qr_code():
+async def generate_qr_code(host: str = None, port: int = 5174):
     """Generate QR code containing Field App LAN URL as base64 PNG."""
     try:
         import qrcode
         from qrcode.image.pure import PyPNGImage
 
         # Detect server IP from env or fallback
-        import socket
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
-        field_url = f"http://{local_ip}:5174"
+        if host:
+            field_url = f"http://{host}:{port}"
+        else:
+            import socket
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            field_url = f"http://{local_ip}:5174"
 
         qr = qrcode.QRCode(version=1, box_size=10, border=2)
         qr.add_data(field_url)
