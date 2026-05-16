@@ -1894,16 +1894,16 @@ triage-v2/
 - [X] systemd service dosyaları (triage-backend.service)
 - [X] Nginx konfigürasyonu (admin + field + API proxy)
 - [X] Bare-metal deployment script (scripts/setup_server.sh)
-- [ ] WiFi hotspot configuration guide
-- [ ] System monitoring setup
+- [X] WiFi hotspot configuration guide
+- [X] System monitoring setup
 
 #### Sprint 6.2: Documentation & Training
-- [ ] User manual (Türkçe)
-- [ ] Admin training materials
-- [ ] Field worker quick guide
-- [ ] Troubleshooting guide
+- [X] User manual (Türkçe)
+- [X] Admin training materials
+- [X] Field worker quick guide
+- [X] Troubleshooting guide
 
-**Çıktı:** Sistem deploy edildi, kullanıcılar eğitildi
+**Çıktı:** Sistem deploy edildi, kullanıcılar eğitildi ✅
 
 ---
 
