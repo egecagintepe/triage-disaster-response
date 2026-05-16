@@ -90,42 +90,54 @@ export default function App() {
   const [zones, setZones] = useState<RiskZone[]>([]);
 
   useEffect(() => {
-    // Initial Hydration from Dexie (or backend via WS)
-    db.zones.toArray().then(async (dbZones) => {
+    const fetchInitialData = async () => {
+      // Load zones from Dexie if available
+      const dbZones = await db.zones.toArray();
       if (dbZones.length > 0) {
         setZones(dbZones.map(zoneToRiskZone));
       } else if (isAuthenticated) {
         // Fallback to REST API if Dexie is empty
         try {
           const apiZones = await api.get<Zone[]>('/api/v1/zones');
+          console.log("[API] Zones fetched:", apiZones);
           if (apiZones && apiZones.length > 0) {
             await db.zones.bulkPut(apiZones);
             setZones(apiZones.map(zoneToRiskZone));
           }
-        } catch (e) {
-          console.error("Failed to fetch initial zones:", e);
+        } catch (error) {
+          console.error("[API] Failed to fetch Zones. Error:", error);
         }
       }
-    });
 
-    // Also fetch Teams and Tasks if they are empty
-    if (isAuthenticated && storeTeams.length === 0) {
-      api.get<Team[]>('/api/v1/teams').then(async (teams) => {
-        if (teams.length > 0) {
-          await db.teams.bulkPut(teams);
-          useTeamStore.getState().setTeams(teams);
+      // Also fetch Teams and Tasks if they are empty
+      if (isAuthenticated && storeTeams.length === 0) {
+        try {
+          const teams = await api.get<Team[]>('/api/v1/teams');
+          console.log("[API] Teams fetched:", teams);
+          if (teams && teams.length > 0) {
+            await db.teams.bulkPut(teams);
+            useTeamStore.getState().setTeams(teams);
+          }
+        } catch (error) {
+          console.error("[API] Failed to fetch Teams. Error:", error);
         }
-      }).catch(e => console.error("Failed to fetch initial teams", e));
-    }
-    
-    if (isAuthenticated && storeTasks.length === 0) {
-      api.get<Task[]>('/api/v1/tasks').then(async (tasks) => {
-        if (tasks.length > 0) {
-          await db.tasks.bulkPut(tasks);
-          useTaskStore.getState().setTasks(tasks);
+      }
+      
+      if (isAuthenticated && storeTasks.length === 0) {
+        try {
+          const tasks = await api.get<Task[]>('/api/v1/tasks');
+          console.log("[API] Tasks fetched:", tasks);
+          if (tasks && tasks.length > 0) {
+            await db.tasks.bulkPut(tasks);
+            useTaskStore.getState().setTasks(tasks);
+          }
+        } catch (error) {
+          console.error("[API] Failed to fetch Tasks. Error:", error);
         }
-      }).catch(e => console.error("Failed to fetch initial tasks", e));
-    }
+      }
+    };
+
+    fetchInitialData();
 
     // Also listen to Dexie changes for zones (since WS updates Dexie, or drawing updates it)
     const subscription = db.zones.hook('creating', () => {

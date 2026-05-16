@@ -8,7 +8,7 @@
  * via VITE_API_URL environment variable.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.1:8000';
+export const API_BASE_URL = "http://localhost:8000";
 
 let isRefreshing = false;
 
@@ -19,7 +19,7 @@ async function request<T>(
 ): Promise<T> {
   const token = localStorage.getItem('auth_token');
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -32,7 +32,7 @@ async function request<T>(
   if (res.status === 401 && !_isRetry && token && !isRefreshing) {
     isRefreshing = true;
     try {
-      const refreshRes = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+      const refreshRes = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,4 +81,4 @@ export const api = {
 /** WebSocket base URL (derived from API URL) */
 export const WS_BASE =
   import.meta.env.VITE_WS_URL ||
-  API_BASE.replace(/^http/, 'ws');
+  API_BASE_URL.replace(/^http/, 'ws');

@@ -26,15 +26,6 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     # Startup: create tables
     await init_db()
-    
-    # Purge Teams table to remove fake seed data
-    from sqlalchemy import delete
-    from models.team import Team
-    async with async_session() as session:
-        await session.execute(delete(Team))
-        await session.commit()
-        print("[OK] Purged Teams table for dynamic auto-registration")
-        
     print("[OK] Database initialised")
     yield
     # Shutdown
@@ -51,7 +42,14 @@ app = FastAPI(
 # CORS – permissive for LAN usage
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:3001", 
+        "http://127.0.0.1:8000", 
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "http://localhost:8081"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

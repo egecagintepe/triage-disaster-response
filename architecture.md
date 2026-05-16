@@ -1882,9 +1882,7 @@ triage-v2/
 - [x] Feature: Native React Draw Control Sub-Panel Under PEN Button
 - [x] Architecture Pivot: Dynamic Device Auto-Registration (No hardcoded teams)
 - [x] Hotfix: Rebind Leaflet L.Draw.Event.CREATED to REST API post
-- [x] Hotfix: Resolve React Crash on L.Draw programmatic trigger
-- [x] Hotfix: Remove DB Seeding completely (Empty state enforcement)
-- [x] Hotfix: Resolve CORS and Port configuration for Field App (3001 -> 8000)
+- [x] Hotfix: Admin UI Data Fetching, Base URL, and CORS strict alignment
 
 
 ---
