@@ -49,6 +49,7 @@ class WebSocketManager {
       this.socket.close();
       this.socket = null;
     }
+    window.dispatchEvent(new CustomEvent('ws_status_change', { detail: false }));
     console.log('[WS] Disconnected');
   }
 
@@ -111,11 +112,13 @@ class WebSocketManager {
     this.socket.onopen = () => {
       console.log('[WS] Connected');
       this.reconnectAttempts = 0;
+      window.dispatchEvent(new CustomEvent('ws_status_change', { detail: true }));
       this.performFullSync();
     };
 
     this.socket.onclose = (ev) => {
       console.log(`[WS] Closed (code=${ev.code})`);
+      window.dispatchEvent(new CustomEvent('ws_status_change', { detail: false }));
       if (!this.intentionalClose) {
         this.scheduleReconnect();
       }

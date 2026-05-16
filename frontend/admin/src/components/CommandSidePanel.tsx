@@ -80,9 +80,9 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
   const backupTasks = tasks.filter((t) => t.status === "needs_backup");
 
   return (
-    <div className="absolute left-6 top-6 bottom-6 w-80 glass-panel flex flex-col pointer-events-auto border-white/5 z-[1005]">
+    <div className="absolute left-6 top-6 bottom-6 w-80 glass-panel flex flex-col pointer-events-auto border-white/[0.04] z-[1005]">
       {/* SECTION: INTEGRATED TOOLBAR */}
-      <div className="p-3 border-b border-white/10 bg-white/[0.02] flex justify-between items-center gap-2">
+      <div className="p-3 border-b border-white/[0.06] bg-white/[0.01] flex justify-between items-center gap-2">
         <div className="flex gap-2">
           {tools.map((tool) => (
             <button
@@ -102,7 +102,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
             </button>
           ))}
         </div>
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-4 w-px bg-white/[0.06]" />
         <div className="flex flex-col items-end">
            <span className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter">MODE</span>
            <span className="text-[10px] font-mono text-blue-400 font-bold">{mode}</span>
@@ -111,7 +111,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
       {/* PEN SUB-PANEL */}
       {mode === "PEN" && (
-        <div className="p-3 border-b border-white/10 bg-blue-500/10 flex gap-2">
+        <div className="p-3 border-b border-white/[0.06] bg-blue-500/10 flex gap-2">
           <button
             onClick={() => {
               if (map) {
@@ -135,7 +135,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
       )}
 
       {/* TAB SWITCHER */}
-      <div className="flex border-b border-white/10">
+      <div className="flex border-b border-white/[0.06]">
         <button
           onClick={() => setActiveTab("tasks")}
           className={`flex-1 py-2 text-[9px] font-bold tracking-[0.15em] uppercase transition-colors ${
@@ -160,7 +160,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
       {/* SECTION: CONTENT */}
       <div className="p-4 flex-1 flex flex-col overflow-hidden">
-        <header className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+        <header className="mb-3 flex items-center justify-between border-b border-white/[0.06] pb-3">
           <div className="flex items-center gap-2">
             <Zap className="h-3 w-3 text-blue-400 fill-blue-400/20" />
             <h3 className="text-white text-[10px] font-bold tracking-[0.2em] uppercase">
@@ -313,7 +313,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-400 font-mono relative z-10">
-                  <div className="flex items-center gap-1.5 bg-black/30 p-1.5 rounded-md border border-white/5">
+                  <div className="flex items-center gap-1.5 bg-black/50 p-1.5 rounded-md border border-white/[0.04]">
                     <Battery className={`h-2.5 w-2.5 ${unit.battery < 20 ? "text-red-500 animate-pulse" : "text-emerald-500"}`} />
                     <span>%{unit.battery}</span>
                   </div>
@@ -334,7 +334,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
       </div>
 
       {/* FOOTER: SYSTEM INFRA */}
-      <footer className="p-4 pt-4 border-t border-white/10 flex items-center justify-between bg-black/20 rounded-b-xl">
+      <footer className="p-4 pt-4 border-t border-white/[0.06] flex items-center justify-between bg-black/40 rounded-b-xl">
         <div className="flex flex-col gap-1">
           <span className="text-[8px] font-bold text-gray-600 tracking-[0.1em]">ENCRYPTION_LAYER</span>
           <span className="text-[9px] font-mono text-gray-400 italic">AES_256_GCM_READY</span>

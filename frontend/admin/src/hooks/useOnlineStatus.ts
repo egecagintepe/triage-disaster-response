@@ -1,8 +1,8 @@
 /**
- * TRIAGE V2 — Online/Offline Status Hook
+ * TRIAGE V2 — Online/Offline Status Hook (Admin)
  *
- * Tracks navigator.onLine and listens for 'online' / 'offline' events.
- * Returns a reactive boolean that components can consume.
+ * Tracks WebSocket connection status via ws_status_change custom events.
+ * Defaults to false (offline) until WS connection succeeds.
  *
  * Reference: architecture.md Section 8 — Offline-First Architecture
  */
@@ -10,29 +10,30 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export function useOnlineStatus(): boolean {
-  const [isOnline, setIsOnline] = useState<boolean>(
-    typeof navigator !== 'undefined' ? navigator.onLine : true,
-  );
+  const [isOnline, setIsOnline] = useState<boolean>(false);
 
-  const handleOnline = useCallback(() => {
-    console.log('[Network] Back online');
-    setIsOnline(true);
-  }, []);
-
-  const handleOffline = useCallback(() => {
-    console.log('[Network] Gone offline');
-    setIsOnline(false);
+  const handleWsStatus = useCallback((e: Event) => {
+    const wsOnline = (e as CustomEvent).detail;
+    console.log(`[Network] WS status changed: ${wsOnline}`);
+    setIsOnline(!!wsOnline);
   }, []);
 
   useEffect(() => {
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    // Primary: WebSocket custom events
+    window.addEventListener('ws_status_change', handleWsStatus);
+
+    // Secondary: browser offline signal
+    const goOffline = () => {
+      console.log('[Network] Browser offline event');
+      setIsOnline(false);
+    };
+    window.addEventListener('offline', goOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('ws_status_change', handleWsStatus);
+      window.removeEventListener('offline', goOffline);
     };
-  }, [handleOnline, handleOffline]);
+  }, [handleWsStatus]);
 
   return isOnline;
 }

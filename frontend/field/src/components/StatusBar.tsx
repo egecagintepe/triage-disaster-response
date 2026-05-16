@@ -37,7 +37,7 @@ export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0
   return (
     <div 
       className={`h-[10vh] flex items-center justify-between px-6 transition-colors duration-500 border-b-2 ${
-        isOnline ? 'bg-emerald-600 border-transparent' : 'bg-gray-800 border-amber-600'
+        isOnline ? 'bg-emerald-600 border-transparent' : 'bg-zinc-950 border-amber-600'
       }`}
     >
       <AnimatePresence mode="wait">
@@ -68,7 +68,7 @@ export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0
 
       <div className="flex items-center gap-4">
         {showSettings ? (
-          <div className="flex items-center gap-2 bg-black/40 p-1 rounded-md">
+          <div className="flex items-center gap-2 bg-black/60 p-1 rounded-md">
             <input 
               type="text" 
               value={ipValue} 

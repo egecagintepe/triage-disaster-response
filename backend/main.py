@@ -1,6 +1,7 @@
 """TRIAGE V2 – FastAPI entry point."""
 
 import json
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,14 +22,92 @@ from services.sync_service import process_sync_changes, get_changes_since
 ws_manager = ConnectionManager()
 
 
+# ---- Autonomous AI Triage Loop ----
+_last_processed_eq_id: str | None = None
+_ai_loop_task: asyncio.Task | None = None
+
+async def _autonomous_triage_loop():
+    """Background loop: poll Kandilli every 60s, auto-generate zones+tasks."""
+    global _last_processed_eq_id
+    from services.afad_client import fetch_latest_earthquake
+    from services.ai_engine import analyze_with_gemini, generate_fallback_analysis
+    from services.task_generator import generate_from_analysis
+    from services.dispatcher import assign_pending_tasks, broadcast_assignments
+
+    print("[AI-LOOP] Autonomous triage loop started")
+    await asyncio.sleep(5)  # Initial delay for server boot
+
+    while True:
+        try:
+            earthquake = await fetch_latest_earthquake()
+            eq_id = earthquake.get("earthquake_id", "")
+
+            if eq_id and eq_id != _last_processed_eq_id:
+                _last_processed_eq_id = eq_id
+                mag = earthquake.get("magnitude", 0)
+                loc = earthquake.get("location", "Bilinmeyen")
+                print(f"[AI-LOOP] New earthquake detected: M{mag} {loc} ({eq_id})")
+
+                # Step 1: AI Analysis
+                affected = earthquake.get("affected_regions", [])
+                ai_result = await analyze_with_gemini(earthquake, affected)
+                if ai_result and "zones" in ai_result:
+                    analysis = ai_result
+                    method = "gemini"
+                else:
+                    analysis = generate_fallback_analysis(earthquake)
+                    method = "fallback"
+                print(f"[AI-LOOP] Analysis complete ({method}): {len(analysis.get('zones', []))} zones")
+
+                # Step 2: Create zones + tasks in DB
+                async with async_session() as session:
+                    result = await generate_from_analysis(session, analysis, earthquake)
+                    print(f"[AI-LOOP] Created {result['zones_created']} zones, {result['tasks_created']} tasks")
+
+                    # Step 3: Broadcast via WebSocket
+                    try:
+                        await ws_manager.broadcast({
+                            "type": "BROADCAST",
+                            "message": (
+                                f"🤖 OTOMATİK AI TRİAJ: M{mag} {loc} — "
+                                f"{result['zones_created']} bölge, {result['tasks_created']} görev oluşturuldu ({method})"
+                            ),
+                        })
+                        for task_data in result.get("tasks", []):
+                            await ws_manager.broadcast({"type": "NEW_TASK", "data": task_data})
+                        for zone_data in result.get("zones", []):
+                            await ws_manager.broadcast({"type": "ZONE_UPDATE", "data": zone_data})
+                    except Exception as e:
+                        print(f"[AI-LOOP] Broadcast error (non-fatal): {e}")
+
+                    # Step 4: Auto-assign tasks
+                    assignments = await assign_pending_tasks(session)
+                    if assignments:
+                        await broadcast_assignments(assignments)
+                        print(f"[AI-LOOP] Auto-assigned {len(assignments)} tasks")
+            else:
+                pass  # Same earthquake, skip
+
+        except Exception as e:
+            print(f"[AI-LOOP] Error (non-fatal, retrying): {e}")
+
+        await asyncio.sleep(60)  # Poll every 60 seconds
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
+    global _ai_loop_task
     # Startup: create tables
     await init_db()
     print("[OK] Database initialised")
+    # Start autonomous AI loop
+    _ai_loop_task = asyncio.create_task(_autonomous_triage_loop())
+    print("[OK] Autonomous AI triage loop started")
     yield
     # Shutdown
+    if _ai_loop_task:
+        _ai_loop_task.cancel()
     print("[STOP] Shutting down")
 
 
@@ -45,10 +124,15 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000", 
         "http://localhost:3001", 
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
         "http://127.0.0.1:8000", 
         "http://localhost:8000",
         "http://localhost:8080",
-        "http://localhost:8081"
+        "http://localhost:8081",
+        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],

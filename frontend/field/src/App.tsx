@@ -133,7 +133,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-gray-950 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-full bg-black overflow-hidden font-sans">
       <StatusBar
         isOnline={isOnline}
         pendingSyncCount={pendingSyncCount}
@@ -203,12 +203,12 @@ export default function App() {
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-gray-900 border border-gray-800 p-8 rounded-3xl"
+              className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl"
             >
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <div className="w-4 h-4 bg-gray-600 rounded-full" />
+              <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <div className="w-4 h-4 bg-zinc-700 rounded-full" />
               </div>
-              <h1 className="text-xl font-bold mb-2">Görev Bekleniyor</h1>
+              <h1 className="text-xl font-bold mb-2 text-gray-100">Görev Bekleniyor</h1>
               <p className="text-gray-500 text-sm">Merkezden yeni görev ataması bekleniyor...</p>
 
               {!isOnline && (

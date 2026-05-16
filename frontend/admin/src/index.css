@@ -1,28 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  --color-bg-base: #111827;
-  --color-bg-elevated: #1F2937;
-  --color-border-default: #374151;
+  /* OLED Command Center Palette */
+  --color-bg-base: #000000;
+  --color-bg-elevated: #09090b;
+  --color-bg-panel: #0a0a0a;
+  --color-border-default: #1c1c1e;
+  --color-border-subtle: #ffffff0d;
   --color-success: #10B981;
   --color-error: #EF4444;
   --color-warning: #F59E0B;
   --color-info: #3B82F6;
+  --color-accent-gold: #D4A843;
+  --color-accent-crimson: #DC2626;
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-gray-950/80 backdrop-blur-xl border border-white/10 shadow-[0_0_25px_rgba(0,0,0,0.5)] rounded-xl;
+    @apply bg-zinc-950/90 backdrop-blur-2xl border border-white/[0.06] shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-xl;
   }
 }
 
 @layer base {
   body {
-    @apply bg-[#0a0f1a] text-gray-50 font-sans overflow-hidden;
+    @apply bg-black text-gray-50 font-sans overflow-hidden antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -39,25 +46,25 @@
 
 /* Custom scrollbar for terminal/logs */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #111827;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: #1c1c1e;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4B5563;
+  background: #27272a;
 }
 
-/* Map marker styles */
+/* Map marker styles — OLED black base */
 .leaflet-container {
-  background: #111827 !important;
+  background: #000000 !important;
 }
 
 .custom-pulsing-dot::after {

@@ -74,13 +74,24 @@ async def generate_from_analysis(
         zone_lat = region.get("lat", epicenter_lat + random.uniform(-0.05, 0.05))
         zone_lng = region.get("lng", epicenter_lng + random.uniform(-0.05, 0.05))
 
-        # --- Create Zone record ---
+        # --- Create Zone record with POLYGON geometry (hex around center) ---
+        # Generate hexagonal polygon (~500m radius, scaled by priority)
+        import math as _math
+        hex_radius = 0.004 * (score / 3.0)  # ~400-700m depending on priority
+        hex_points = []
+        for angle_i in range(6):
+            angle_rad = _math.radians(60 * angle_i - 30)
+            hex_lat = zone_lat + hex_radius * _math.cos(angle_rad)
+            hex_lng = zone_lng + hex_radius * _math.sin(angle_rad) / _math.cos(_math.radians(zone_lat))
+            hex_points.append([hex_lng, hex_lat])
+        hex_points.append(hex_points[0])  # Close the polygon
+
         zone = Zone(
             name=zone_name,
             priority_score=score,
             geometry={
-                "type": "Point",
-                "coordinates": [zone_lng, zone_lat],
+                "type": "Polygon",
+                "coordinates": [hex_points],
             },
             estimated_casualties=estimated_casualties,
             building_density=region.get("building_count", int(region.get("population_density", 5000) * 0.3)),

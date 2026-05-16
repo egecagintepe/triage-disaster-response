@@ -225,7 +225,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-screen w-screen bg-bg-base text-gray-50 overflow-hidden font-sans">
+    <div className="relative h-screen w-screen bg-black text-gray-50 overflow-hidden font-sans">
       <MapPanel
         units={units}
         riskZones={zones}

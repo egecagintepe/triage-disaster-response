@@ -21,8 +21,8 @@ interface Props {
  */
 export default function IntelligenceLogPanel({ logs }: Props) {
   return (
-    <aside className="absolute right-6 top-6 bottom-6 w-96 glass-panel flex flex-col overflow-hidden z-[1001] border-white/5">
-      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+    <aside className="absolute right-6 top-6 bottom-6 w-96 glass-panel flex flex-col overflow-hidden z-[1001] border-white/[0.04]">
+      <div className="p-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.01]">
         <h3 className="text-gray-400 text-[10px] font-bold tracking-[0.2em] uppercase">
           MATRIX_FEED_v4.2
         </h3>

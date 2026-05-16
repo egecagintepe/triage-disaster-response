@@ -13,12 +13,14 @@
 
 @layer base {
   html, body, #root {
-    @apply h-full w-full overflow-hidden overscroll-none bg-[#111827] text-white;
+    @apply h-full w-full overflow-hidden overscroll-none bg-black text-white;
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Custom Scrollbar for small scrollable areas if any (though design says none) */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -26,12 +28,12 @@
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-700 rounded-full;
+  @apply bg-zinc-800 rounded-full;
 }
 
-/* Leaflet Dark Mode Adjustment */
+/* Leaflet Dark Mode — OLED */
 .leaflet-container {
-  background: #111827 !important;
+  background: #000000 !important;
 }
 
 .leaflet-tile-pane {
@@ -43,9 +45,9 @@
 }
 
 .leaflet-bar a {
-  @apply bg-gray-800! text-white! border-gray-700!;
+  @apply bg-zinc-900! text-white! border-zinc-800!;
 }
 
 .leaflet-control-attribution {
-  @apply bg-gray-900/50! text-gray-500! text-[10px]!;
+  @apply bg-black/70! text-zinc-500! text-[10px]!;
 }

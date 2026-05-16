@@ -155,7 +155,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
   };
 
   return (
-    <div className="absolute inset-0 z-0 bg-[#0a0f1a]">
+    <div className="absolute inset-0 z-0 bg-black">
       <MapContainer
         center={position}
         zoom={13}
@@ -182,7 +182,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           <FeatureGroup>
             <EditControl
               position="topright"
-              onCreated={onCreated}
+              onCreated={() => {/* Handled by useEffect map.on(L.Draw.Event.CREATED) */}}
               draw={{
                 rectangle: false,
                 circle: false,
@@ -225,7 +225,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
               }}
             >
               <Tooltip sticky>
-                <div className="bg-gray-950 border border-white/10 text-white p-1.5 text-[10px] rounded font-mono shadow-2xl backdrop-blur-md">
+                <div className="bg-zinc-950 border border-white/[0.06] text-gray-100 p-1.5 text-[10px] rounded font-mono shadow-2xl backdrop-blur-md">
                   <span className="opacity-60 text-blue-400">ZONE_CORE:</span> {zone.id}<br/>
                   <span className="opacity-60 text-red-400">THREAT_LVL:</span> {zone.score}%
                   {zone.isHumanOverride && <div className="mt-1 text-amber-400 border-t border-white/10 pt-1">⭐ MANUAL_OVERRIDE_ENABLED</div>}
@@ -246,7 +246,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
             }}
           >
             <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-              <div className="bg-gray-950/90 text-gray-50 border border-white/10 p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
+              <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
                 <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">TASK://{task.id}</p>
                 <div className="space-y-0.5">
                   <p>ÖNCELİK: <span className={
@@ -272,7 +272,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
             )}
             <Marker position={unit.coords} icon={createUnitIcon(unit.statusType)}>
               <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-                <div className="bg-gray-950/90 text-gray-50 border border-white/10 p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md">
+                <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md">
                   <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">UNIT://{unit.ip}</p>
                   <div className="space-y-0.5">
                     <p>STATUS: <span className="text-gray-300">{unit.status}</span></p>
@@ -291,7 +291,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         <div className="pointer-events-none h-full w-full">
           <CommandSidePanel units={units} tasks={tasks} map={map} mode={toolMode} setMode={setToolMode} isOnline={isOnline} />
           
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel p-2.5 px-6 flex items-center gap-6 pointer-events-none border-blue-500/20">
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel p-2.5 px-6 flex items-center gap-6 pointer-events-none border-white/[0.04]">
             <div className="flex flex-col gap-0.5">
               <span className="text-[9px] text-gray-500 font-bold tracking-tighter">COORDINATE_GRID</span>
               <span className="text-[11px] font-mono text-blue-400/80">LAT:{position[0].toFixed(5)} LON:{position[1].toFixed(5)}</span>
