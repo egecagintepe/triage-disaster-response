@@ -45,6 +45,17 @@ async def create_zone(payload: ZoneCreate, db: AsyncSession = Depends(get_db)):
     db.add(zone)
     await db.commit()
     await db.refresh(zone)
+    
+    try:
+        from main import ws_manager
+        from schemas.zone import ZoneResponse
+        await ws_manager.broadcast({
+            "type": "ZONE_UPDATE",
+            "data": ZoneResponse.model_validate(zone).model_dump()
+        })
+    except Exception:
+        pass
+
     return zone
 
 
@@ -63,6 +74,17 @@ async def update_zone(zone_id: int, payload: ZoneUpdate, db: AsyncSession = Depe
 
     await db.commit()
     await db.refresh(zone)
+
+    try:
+        from main import ws_manager
+        from schemas.zone import ZoneResponse
+        await ws_manager.broadcast({
+            "type": "ZONE_UPDATE",
+            "data": ZoneResponse.model_validate(zone).model_dump()
+        })
+    except Exception:
+        pass
+
     return zone
 
 

@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {registerSW} from 'virtual:pwa-register';
 import App from './App.tsx';
 import './index.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
 
 // Install the PWA service worker for true offline capability.
 // The SW caches all static assets + map tiles via Workbox rules

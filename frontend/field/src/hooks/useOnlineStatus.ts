@@ -14,25 +14,19 @@ export function useOnlineStatus(): boolean {
     typeof navigator !== 'undefined' ? navigator.onLine : true,
   );
 
-  const handleOnline = useCallback(() => {
-    console.log('[Network] Back online');
-    setIsOnline(true);
-  }, []);
-
-  const handleOffline = useCallback(() => {
-    console.log('[Network] Gone offline');
-    setIsOnline(false);
+  const handleOnline = useCallback((e: Event) => {
+    const isWsOnline = (e as CustomEvent).detail;
+    console.log(`[Network] WS status changed: ${isWsOnline}`);
+    setIsOnline(isWsOnline);
   }, []);
 
   useEffect(() => {
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener('ws_status_change', handleOnline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('ws_status_change', handleOnline);
     };
-  }, [handleOnline, handleOffline]);
+  }, [handleOnline]);
 
   return isOnline;
 }

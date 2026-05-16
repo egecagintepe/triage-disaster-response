@@ -3,12 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline, CircleMarker } from "react-leaflet";
+import { useState, useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Tooltip, Polygon, Polyline, CircleMarker, FeatureGroup } from "react-leaflet";
+import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet-draw/dist/leaflet.draw.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode } from "../types";
 import type { Task } from "../services/localDb";
+import { api } from "../services/api";
 import CommandSidePanel from "./CommandSidePanel";
 
 const createUnitIcon = (status: UnitStatus) => {
@@ -80,6 +83,77 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
   const [map, setMap] = useState<L.Map | null>(null);
   const position: [number, number] = [41.0082, 28.9784];
 
+  // Restore the programmatic drawing listener
+  useEffect(() => {
+    if (!map) return;
+    
+    // Explicitly rebind the drawing persistence pipeline
+    const handleDrawCreated = async (e: any) => {
+      const { layerType, layer } = e;
+      if (layerType === 'polygon') {
+        const latlngs = layer.getLatLngs()[0];
+        const coordinates = [latlngs.map((ll: any) => [ll.lng, ll.lat])];
+        // Close the polygon
+        coordinates[0].push([latlngs[0].lng, latlngs[0].lat]);
+        
+        const geojson = {
+          type: "Polygon",
+          coordinates
+        };
+
+        // Add layer to map visually so it doesn't disappear immediately
+        map.addLayer(layer);
+
+        try {
+          await api.post('/api/v1/zones', {
+            name: `Bölge ${Math.floor(Math.random() * 1000)}`,
+            priority_score: 3.5, 
+            geometry: geojson
+          });
+          // Note: ZONE_UPDATE will be broadcasted by backend to sync
+        } catch (err) {
+          console.error("Bölge oluşturulamadı:", err);
+          map.removeLayer(layer); // remove if failed
+        }
+        
+        setToolMode("CURSOR");
+      }
+    };
+
+    map.on(L.Draw.Event.CREATED, handleDrawCreated);
+
+    return () => {
+      map.off(L.Draw.Event.CREATED, handleDrawCreated);
+    };
+  }, [map, setToolMode]);
+
+  // Priority Toggle
+  const handleZoneClick = async (zone: RiskZone) => {
+    if (toolMode === "OVERRIDE") {
+      let nextPriorityScore = 4.5;
+      if (zone.type === ZoneType.URGENT) nextPriorityScore = 3.0; // RED -> YELLOW
+      else if (zone.type === ZoneType.MEDIUM) nextPriorityScore = 1.5; // YELLOW -> GREEN
+      else nextPriorityScore = 4.5; // GREEN/SAFE/NO_GO -> RED
+
+      try {
+        await api.patch(`/api/v1/zones/${zone.id}`, { priority_score: nextPriorityScore });
+      } catch (e) {
+        console.error("Zone priority override failed", e);
+      }
+    }
+  };
+
+  const handleTaskClick = async (task: Task) => {
+    if (toolMode === "OVERRIDE") {
+      const nextPriority = task.priority === "RED" ? "YELLOW" : task.priority === "YELLOW" ? "GREEN" : "RED";
+      try {
+        await api.patch(`/api/v1/tasks/${task.id}`, { priority: nextPriority });
+      } catch (e) {
+        console.error("Task priority override failed", e);
+      }
+    }
+  };
+
   return (
     <div className="absolute inset-0 z-0 bg-[#0a0f1a]">
       <MapContainer
@@ -88,6 +162,9 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         className="h-full w-full z-0"
         zoomControl={false}
         attributionControl={false}
+        dragging={true}
+        scrollWheelZoom={true}
+        doubleClickZoom={true}
         ref={setMap}
       >
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
@@ -99,6 +176,28 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
             </pattern>
           </defs>
         </svg>
+
+        {/* Draw Controls */}
+        {toolMode === "PEN" && (
+          <FeatureGroup>
+            <EditControl
+              position="topright"
+              onCreated={onCreated}
+              draw={{
+                rectangle: false,
+                circle: false,
+                circlemarker: false,
+                marker: false,
+                polyline: false,
+                polygon: {
+                  allowIntersection: false,
+                  drawError: { color: "#e1e100", message: "Kesişim olamaz!" },
+                  shapeOptions: { color: "#3B82F6" }
+                }
+              }}
+            />
+          </FeatureGroup>
+        )}
         
         {/* Risk Zones */}
         {riskZones.map((zone) => {
@@ -117,7 +216,14 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           };
 
           return (
-            <Polygon key={zone.id} positions={zone.points} pathOptions={pathOptions}>
+            <Polygon 
+              key={zone.id} 
+              positions={zone.points} 
+              pathOptions={pathOptions}
+              eventHandlers={{
+                click: () => handleZoneClick(zone)
+              }}
+            >
               <Tooltip sticky>
                 <div className="bg-gray-950 border border-white/10 text-white p-1.5 text-[10px] rounded font-mono shadow-2xl backdrop-blur-md">
                   <span className="opacity-60 text-blue-400">ZONE_CORE:</span> {zone.id}<br/>
@@ -135,6 +241,9 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
             key={`task-${task.id}`}
             position={[task.lat, task.lng]}
             icon={createTaskIcon(task.priority, task.status)}
+            eventHandlers={{
+              click: () => handleTaskClick(task)
+            }}
           >
             <Tooltip direction="top" offset={[0, -10]} opacity={1}>
               <div className="bg-gray-950/90 text-gray-50 border border-white/10 p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
@@ -179,7 +288,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
       
       {/* HUD & Panels - Siblings of MapContainer to ensure top-layer render */}
       <div className="absolute inset-0 pointer-events-none z-[1000]">
-        <div className="pointer-events-auto h-full w-full">
+        <div className="pointer-events-none h-full w-full">
           <CommandSidePanel units={units} tasks={tasks} map={map} mode={toolMode} setMode={setToolMode} isOnline={isOnline} />
           
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel p-2.5 px-6 flex items-center gap-6 pointer-events-none border-blue-500/20">

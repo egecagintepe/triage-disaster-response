@@ -2,6 +2,7 @@
 
 from typing import Dict, Optional
 from datetime import datetime, timezone
+import asyncio
 from fastapi import WebSocket
 
 
@@ -20,11 +21,27 @@ class ConnectionManager:
         self.active_connections[device_id] = websocket
         self.last_seen[device_id] = datetime.now(timezone.utc)
         print(f"[WS] Device connected: {device_id} (total: {len(self.active_connections)})")
+        await self.broadcast({
+            "type": "TEAM_PRESENCE",
+            "team_id": device_id,
+            "status": "ONLINE"
+        }, exclude=device_id)
 
     def disconnect(self, device_id: str) -> None:
         """Remove a device's WebSocket connection."""
-        self.active_connections.pop(device_id, None)
-        print(f"[WS] Device disconnected: {device_id} (total: {len(self.active_connections)})")
+        if device_id in self.active_connections:
+            self.active_connections.pop(device_id)
+            print(f"[WS] Device disconnected: {device_id} (total: {len(self.active_connections)})")
+            # Disconnect is synchronous, use create_task to broadcast
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.broadcast({
+                    "type": "TEAM_PRESENCE",
+                    "team_id": device_id,
+                    "status": "OFFLINE"
+                }))
+            except RuntimeError:
+                pass
 
     async def send_personal(self, device_id: str, message: dict) -> bool:
         """Send a JSON message to a specific device. Returns True if sent."""

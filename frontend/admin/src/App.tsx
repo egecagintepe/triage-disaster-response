@@ -14,6 +14,7 @@ import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { syncQueue } from "./services/syncQueue";
 import { wsManager } from "./services/websocket";
 import { db, type Task, type Team, type Zone } from "./services/localDb";
+import { api } from "./services/api";
 
 /* ------------------------------------------------------------------ */
 /*  Transform backend models → existing UI types                       */
@@ -27,6 +28,7 @@ function teamToFieldUnit(team: Team): FieldUnit {
   };
   return {
     id: String(team.id),
+    name: team.name,
     ip: team.device_ip || `192.168.x.${team.id + 1}`,
     status: team.status === "idle" ? "Beklemede"
           : team.status === "busy" ? "Görevde"
@@ -35,6 +37,7 @@ function teamToFieldUnit(team: Team): FieldUnit {
     coords: [team.current_lat ?? 41.0082, team.current_lng ?? 28.9784],
     battery: 100,  // Will come from heartbeat in future
     ping: 0,
+    isOnline: !!team.is_online,
   };
 }
 
@@ -60,22 +63,7 @@ function zoneToRiskZone(zone: Zone): RiskZone {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Fallback demo data (used when stores are empty / no backend)       */
-/* ------------------------------------------------------------------ */
-
-const DEMO_UNITS: FieldUnit[] = [
-  { id: "1", ip: "192.168.x.2", status: "Hedefe Yakın", statusType: UnitStatus.BUSY, coords: [41.015, 28.98], destination: [41.012, 28.95], battery: 84, ping: 12 },
-  { id: "2", ip: "192.168.x.3", status: "Beklemede", statusType: UnitStatus.IDLE, coords: [41.00, 28.96], battery: 92, ping: 18 },
-  { id: "3", ip: "192.168.x.4", status: "Çevrimdışı", statusType: UnitStatus.OFFLINE, coords: [41.025, 28.92], battery: 0, ping: 999 },
-  { id: "4", ip: "192.168.x.5", status: "Devriye", statusType: UnitStatus.IDLE, coords: [40.98, 29.02], battery: 76, ping: 24 },
-];
-
-const DEMO_ZONES: RiskZone[] = [
-  { id: "z1", type: ZoneType.URGENT, score: 92, points: [[41.01, 28.95], [41.02, 28.96], [41.015, 28.97]] },
-  { id: "z2", type: ZoneType.MEDIUM, score: 54, points: [[40.99, 29.00], [41.00, 29.02], [40.98, 29.01]] },
-  { id: "z3", type: ZoneType.NO_GO, score: 0, points: [[41.03, 28.90], [41.04, 28.92], [41.02, 28.91]] },
-];
-
+/*  Backend Fetchers & Fallbacks (Mock data purged)                   */
 /* ------------------------------------------------------------------ */
 /*  App                                                                */
 /* ------------------------------------------------------------------ */
@@ -92,22 +80,69 @@ export default function App() {
   const storeTeams = useTeamStore((s) => s.teams);
   const storeTasks = useTaskStore((s) => s.tasks);
 
-  // Transform store data → UI types (with fallback to demo data)
+  // Transform store data → UI types
   const units: FieldUnit[] = useMemo(
-    () => storeTeams.length > 0 ? storeTeams.map(teamToFieldUnit) : DEMO_UNITS,
+    () => storeTeams.map(teamToFieldUnit),
     [storeTeams],
   );
 
   // Zone data from Dexie (read once on mount, updated by WS)
-  const [zones, setZones] = useState<RiskZone[]>(DEMO_ZONES);
+  const [zones, setZones] = useState<RiskZone[]>([]);
 
   useEffect(() => {
-    // Load zones from Dexie if available
-    db.zones.toArray().then((dbZones) => {
+    // Initial Hydration from Dexie (or backend via WS)
+    db.zones.toArray().then(async (dbZones) => {
       if (dbZones.length > 0) {
         setZones(dbZones.map(zoneToRiskZone));
+      } else if (isAuthenticated) {
+        // Fallback to REST API if Dexie is empty
+        try {
+          const apiZones = await api.get<Zone[]>('/api/v1/zones');
+          if (apiZones && apiZones.length > 0) {
+            await db.zones.bulkPut(apiZones);
+            setZones(apiZones.map(zoneToRiskZone));
+          }
+        } catch (e) {
+          console.error("Failed to fetch initial zones:", e);
+        }
       }
     });
+
+    // Also fetch Teams and Tasks if they are empty
+    if (isAuthenticated && storeTeams.length === 0) {
+      api.get<Team[]>('/api/v1/teams').then(async (teams) => {
+        if (teams.length > 0) {
+          await db.teams.bulkPut(teams);
+          useTeamStore.getState().setTeams(teams);
+        }
+      }).catch(e => console.error("Failed to fetch initial teams", e));
+    }
+    
+    if (isAuthenticated && storeTasks.length === 0) {
+      api.get<Task[]>('/api/v1/tasks').then(async (tasks) => {
+        if (tasks.length > 0) {
+          await db.tasks.bulkPut(tasks);
+          useTaskStore.getState().setTasks(tasks);
+        }
+      }).catch(e => console.error("Failed to fetch initial tasks", e));
+    }
+
+    // Also listen to Dexie changes for zones (since WS updates Dexie, or drawing updates it)
+    const subscription = db.zones.hook('creating', () => {
+      db.zones.toArray().then(z => setZones(z.map(zoneToRiskZone)));
+    });
+    const sub2 = db.zones.hook('updating', () => {
+      db.zones.toArray().then(z => setZones(z.map(zoneToRiskZone)));
+    });
+    const sub3 = db.zones.hook('deleting', () => {
+      db.zones.toArray().then(z => setZones(z.map(zoneToRiskZone)));
+    });
+
+    return () => {
+      db.zones.hook('creating').unsubscribe(subscription);
+      db.zones.hook('updating').unsubscribe(sub2);
+      db.zones.hook('deleting').unsubscribe(sub3);
+    };
   }, []);
 
   // --- Log helper ---
@@ -138,21 +173,10 @@ export default function App() {
     addLog("Uplink", "SECURE_TUNNEL_ESTABLISHED", LogType.SYSTEM);
     addLog("Central", "AI_ENGINE_v4_ONLINE", LogType.AI);
 
-    // Demo scenario interval (will be replaced by real WS events)
-    const scenarios = [
-      () => addLog("Bornova 3. Sokak", "skoru güncellendi -> KIRMIZI", LogType.AI),
-      () => addLog("Ekip x.x.x.4", "hedefe ulaştı.", LogType.ROUTINE),
-      () => addLog("Ekip x.x.x.2", "bağlantısı koptu. SINYAL_KAYBI", LogType.SYSTEM),
-      () => addLog("Ekip x.x.x.2", "DESTEK TALEBİ! ACİL", LogType.CRITICAL),
-      () => addLog("AI_CENTRAL", "Yeni devriye rotası optimize edildi.", LogType.AI),
-    ];
-
-    const interval = setInterval(() => {
-      scenarios[Math.floor(Math.random() * scenarios.length)]();
-    }, 5000);
+    // Replace demo scenarios with real system hooks
+    // No more random interval logging, just real events from WS or TaskStore changes.
 
     return () => {
-      clearInterval(interval);
       syncQueue.stopAutoSync();
       wsManager.disconnect();
     };

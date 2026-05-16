@@ -21,6 +21,7 @@ export enum UnitStatus {
 
 export interface FieldUnit {
   id: string;
+  name: string;
   ip: string;
   status: string;
   statusType: UnitStatus;
@@ -28,6 +29,7 @@ export interface FieldUnit {
   destination?: [number, number];
   battery: number;
   ping: number;
+  isOnline: boolean;
 }
 
 export enum ZoneType {

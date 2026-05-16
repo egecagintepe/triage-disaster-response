@@ -1865,6 +1865,25 @@ triage-v2/
 
 **Çıktı:** Her iki frontend uygulaması backend API’ye bağlı ve offline-first çalışıyor ✅
 
+#### Sprint 4.3: Gerçek Zamanlı Veri ve Aksiyon Entegrasyonu (Purge Mock Data & Core Wiring)
+- [x] `App.tsx` içerisindeki mock veriler (`DEMO_UNITS`, `DEMO_ZONES`) temizlenecek, API'den gerçek state beslemesi (initial hydration) yapılacak.
+- [x] `MapPanel.tsx`'te `react-leaflet-draw` ile Bölge Çizme (POST `/api/v1/zones`) entegrasyonu.
+- [x] `MapPanel.tsx`'te Öncelik Ezme aracı ile döngüsel (RED->YELLOW->GREEN) PATCH isteği atılması ve WS broadcast tetiklenmesi.
+- [x] `CommandSidePanel.tsx` veya `MapPanel.tsx` üzerinden Manuel Ekip Atama işlemlerinin backend ile entegrasyonu.
+- [x] `syncQueue.ts`'nin Zone koleksiyonu işlemlerini kuyruklaması ve senkronize etmesi.
+- [x] Backend `zones.py` rotalarının WS `ZONE_UPDATE` broadcast olayını tetiklemesi.
+- [x] Fix Map Pointer-Events & Move Draw Controls to Top-Right.
+- [x] Implement WebSocket TEAM_PRESENCE handshake.
+- [x] Hotfix: Map Navigation & Leaflet Draw CSS Integration
+- [x] Feature: Mobile Dynamic IP Config Storage
+- [x] Hotfix: Admin UI Real-time Presence Sync
+- [x] Feature: Custom Integrated Draw Toolbar UI
+- [x] Hotfix: SQLite DB Team Seeding & Schema Sync
+- [x] Feature: Native React Draw Control Sub-Panel Under PEN Button
+- [x] Architecture Pivot: Dynamic Device Auto-Registration (No hardcoded teams)
+- [x] Hotfix: Rebind Leaflet L.Draw.Event.CREATED to REST API post
+
+
 ---
 
 ### PHASE 5: Testing & Optimization (Sprint 10, 1 hafta)

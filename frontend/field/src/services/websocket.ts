@@ -13,7 +13,7 @@
  */
 
 import { db } from './localDb';
-import { WS_BASE } from './api';
+import { getWsBase } from './api';
 import { syncQueue } from './syncQueue';
 import { useTaskStore } from '../stores/taskStore';
 import { useTeamStore } from '../stores/teamStore';
@@ -46,6 +46,7 @@ class WebSocketManager {
       this.socket.close();
       this.socket = null;
     }
+    window.dispatchEvent(new CustomEvent('ws_status_change', { detail: false }));
     console.log('[WS] Disconnected');
   }
 
@@ -97,7 +98,7 @@ class WebSocketManager {
   /* ---------------------------------------------------------------- */
 
   private openSocket(): void {
-    const url = `${WS_BASE}/ws/${this.deviceId}`;
+    const url = `${getWsBase()}/ws/${this.deviceId}`;
     console.log(`[WS] Connecting to ${url}…`);
 
     try {
@@ -111,11 +112,13 @@ class WebSocketManager {
     this.socket.onopen = () => {
       console.log('[WS] Connected');
       this.reconnectAttempts = 0;
+      window.dispatchEvent(new CustomEvent('ws_status_change', { detail: true }));
       this.performFullSync();
     };
 
     this.socket.onclose = (ev) => {
       console.log(`[WS] Closed (code=${ev.code})`);
+      window.dispatchEvent(new CustomEvent('ws_status_change', { detail: false }));
       if (!this.intentionalClose) {
         this.scheduleReconnect();
       }

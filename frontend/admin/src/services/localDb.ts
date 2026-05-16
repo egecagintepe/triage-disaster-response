@@ -43,6 +43,7 @@ export interface Team {
   last_seen?: string;
   current_lat?: number;
   current_lng?: number;
+  is_online?: boolean;
   created_at?: string;
 }
 

@@ -75,13 +75,23 @@ async def health_check():
 
 @app.websocket("/ws/{device_id}")
 async def websocket_endpoint(websocket: WebSocket, device_id: str):
-    """WebSocket endpoint for real-time device communication.
+    """WebSocket endpoint for real-time device communication."""
+    
+    # Auto-registration
+    client_ip = websocket.client.host if websocket.client else "unknown"
+    from sqlalchemy import select
+    from models.team import Team
+    async with async_session() as session:
+        result = await session.execute(select(Team).where(Team.device_id == device_id))
+        team = result.scalar_one_or_none()
+        if not team:
+            team = Team(device_id=device_id, name=device_id, device_ip=client_ip, status="idle")
+            session.add(team)
+        else:
+            team.device_ip = client_ip
+            team.status = "idle"
+        await session.commit()
 
-    Protocol:
-    - Client sends JSON messages with a "type" field.
-    - Server broadcasts updates to all connected devices.
-    - Supports: SYNC_REQUEST, LOCATION_UPDATE, TASK_STATUS_UPDATE
-    """
     await ws_manager.connect(websocket, device_id)
     try:
         while True:

@@ -85,3 +85,7 @@
   }
 }
 
+/* Hide default Leaflet Draw completely - we are using programmatic custom UI */
+.leaflet-draw {
+  display: none !important;
+}

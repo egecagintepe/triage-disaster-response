@@ -20,12 +20,21 @@ async def list_teams(
     db: AsyncSession = Depends(get_db),
 ):
     """List all teams with optional status filter."""
+    from main import ws_manager
     stmt = select(Team)
     if status:
         stmt = stmt.where(Team.status == status)
     stmt = stmt.order_by(Team.name)
     result = await db.execute(stmt)
-    return result.scalars().all()
+    teams = result.scalars().all()
+    
+    response_list = []
+    for team in teams:
+        team_dict = team.__dict__.copy()
+        # Active connections keys are device_id (string)
+        team_dict["is_online"] = team.device_id in ws_manager.active_connections
+        response_list.append(team_dict)
+    return response_list
 
 
 @router.get("/{team_id}", response_model=TeamResponse)

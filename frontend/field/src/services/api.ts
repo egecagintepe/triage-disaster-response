@@ -8,7 +8,15 @@
  * via VITE_API_URL environment variable.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://192.168.1.1:8000';
+export const getApiBase = () => {
+  const ip = localStorage.getItem('triage_server_ip') || 'localhost:8000';
+  return `http://${ip}`;
+};
+
+export const getWsBase = () => {
+  const ip = localStorage.getItem('triage_server_ip') || 'localhost:8000';
+  return `ws://${ip}`;
+};
 
 let isRefreshing = false;
 
@@ -19,7 +27,7 @@ async function request<T>(
 ): Promise<T> {
   const token = localStorage.getItem('auth_token');
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${getApiBase()}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -32,7 +40,7 @@ async function request<T>(
   if (res.status === 401 && !_isRetry && token && !isRefreshing) {
     isRefreshing = true;
     try {
-      const refreshRes = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+      const refreshRes = await fetch(`${getApiBase()}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +86,3 @@ export const api = {
     request<T>(path, { method: 'DELETE' }),
 };
 
-/** WebSocket base URL (derived from API URL) */
-export const WS_BASE =
-  import.meta.env.VITE_WS_URL ||
-  API_BASE.replace(/^http/, 'ws');

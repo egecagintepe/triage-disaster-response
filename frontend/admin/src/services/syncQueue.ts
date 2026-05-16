@@ -142,6 +142,16 @@ class SyncQueue {
         }
         break;
 
+      case 'zones':
+        if (operation === 'create') {
+          await api.post('/api/v1/zones', data);
+        } else if (operation === 'update' && data.id) {
+          await api.patch(`/api/v1/zones/${data.id}`, data);
+        } else if (operation === 'delete' && data.id) {
+          await api.delete(`/api/v1/zones/${data.id}`);
+        }
+        break;
+
       default:
         console.warn(`[SyncQueue] Unknown collection: ${collection}`);
     }

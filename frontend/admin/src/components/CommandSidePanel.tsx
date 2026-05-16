@@ -109,6 +109,31 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
         </div>
       </div>
 
+      {/* PEN SUB-PANEL */}
+      {mode === "PEN" && (
+        <div className="p-3 border-b border-white/10 bg-blue-500/10 flex gap-2">
+          <button
+            onClick={() => {
+              if (map) {
+                // @ts-ignore
+                new L.Draw.Polygon(map).enable();
+              }
+            }}
+            className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold py-2 rounded transition-colors"
+          >
+            BÖLGE ÇİZİMİ BAŞLAT
+          </button>
+          <button
+            onClick={() => {
+              setMode("CURSOR");
+            }}
+            className="flex-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/30 text-[10px] font-bold py-2 rounded transition-colors"
+          >
+            İPTAL ET
+          </button>
+        </div>
+      )}
+
       {/* TAB SWITCHER */}
       <div className="flex border-b border-white/10">
         <button
@@ -257,7 +282,7 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
         {/* FLEET TAB */}
         {activeTab === "fleet" && (
           <div className="flex-1 overflow-y-auto space-y-2.5 pr-2 scrollbar-none">
-            {units.map((unit) => (
+            {units && units.length > 0 ? units.map((unit) => (
               <button
                 key={unit.id}
                 onClick={() => handleUnitClick(unit)}
@@ -270,9 +295,12 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
                 <div className="flex justify-between items-start relative z-10">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-mono text-gray-500 tracking-tighter">NODE_ADDR: {unit.ip}</span>
+                    <span className="text-[9px] font-mono text-gray-500 tracking-tighter flex items-center gap-1.5">
+                      <div className={`h-1.5 w-1.5 rounded-full ${unit.isOnline ? "bg-emerald-500 animate-[pulse_2s_ease-in-out_infinite]" : "bg-red-500"}`} />
+                      NODE_ADDR: {unit.ip}
+                    </span>
                     <h4 className="text-[13px] font-bold text-gray-100 group-hover:text-blue-400 transition-colors tracking-tight">
-                      Unit_{unit.id === "1" ? "ALFA" : unit.id === "2" ? "BRAVO" : unit.id === "3" ? "CHARLIE" : "DELTA"}
+                      {unit.name}
                     </h4>
                   </div>
                   <div className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-tighter border ${
@@ -298,7 +326,9 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                   </div>
                 </div>
               </button>
-            ))}
+            )) : (
+              <p className="text-gray-500 text-xs p-4 border border-white/10 rounded bg-white/5 font-mono text-center">Veritabanında ekip bulunamadı veya yükleniyor...</p>
+            )}
           </div>
         )}
       </div>

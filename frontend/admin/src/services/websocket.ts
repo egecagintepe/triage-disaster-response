@@ -157,8 +157,16 @@ class WebSocketManager {
         await this.handleNewTask(msg.data as Record<string, unknown>);
         break;
 
+      case 'ZONE_UPDATE':
+        await this.handleZoneUpdate(msg.data as Record<string, unknown>);
+        break;
+
       case 'DEVICE_LOCATION':
         this.handleDeviceLocation(msg);
+        break;
+
+      case 'TEAM_PRESENCE':
+        this.handleTeamPresence(msg.data as Record<string, unknown> || msg);
         break;
 
       case 'BROADCAST':
@@ -240,6 +248,16 @@ class WebSocketManager {
     }
   }
 
+  private async handleZoneUpdate(data: Record<string, unknown>): Promise<void> {
+    if (!data || !data.id) return;
+    try {
+      await db.zones.put(data as any);
+      // App.tsx has a db.zones hook that will automatically update the UI when this happens
+    } catch (e) {
+      console.error('[WS] Failed to save zone update:', e);
+    }
+  }
+
   private handleDeviceLocation(msg: Record<string, unknown>): void {
     const deviceId = msg.device_id as string;
     const lat = msg.lat as number;
@@ -250,6 +268,23 @@ class WebSocketManager {
     const team = teams.find((t) => t.device_id === deviceId);
     if (team) {
       useTeamStore.getState().setTeamLocation(team.id, lat, lng);
+    }
+  }
+
+  private handleTeamPresence(msg: Record<string, unknown>): void {
+    const teamId = msg.team_id as string;
+    const status = msg.status as string; // 'ONLINE' | 'OFFLINE'
+    
+    // Find team and update its status
+    const teams = useTeamStore.getState().teams;
+    const team = teams.find((t) => t.device_id === teamId);
+    if (team) {
+      console.log("Team presence updated:", teamId, "to", status);
+      const isOnline = status === 'ONLINE';
+      
+      const updatedTeam = { ...team, is_online: isOnline };
+      useTeamStore.getState().updateTeam(updatedTeam);
+      db.teams.update(team.id, { is_online: isOnline }).catch(console.error);
     }
   }
 

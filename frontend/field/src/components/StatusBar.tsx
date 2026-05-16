@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Wifi, WifiOff, CloudOff } from 'lucide-react';
+import { Wifi, WifiOff, CloudOff, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface StatusBarProps {
@@ -11,6 +11,14 @@ interface StatusBarProps {
 export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0, teamName }: StatusBarProps) {
   // Use prop if provided, otherwise fall back to own detection
   const [localOnline, setLocalOnline] = useState(navigator.onLine);
+  
+  const [showSettings, setShowSettings] = useState(false);
+  const [ipValue, setIpValue] = useState(() => localStorage.getItem('triage_server_ip') || 'localhost:8000');
+
+  const handleSaveIp = () => {
+    localStorage.setItem('triage_server_ip', ipValue);
+    window.location.reload();
+  };
 
   useEffect(() => {
     if (isOnlineProp !== undefined) return; // Skip if controlled via prop
@@ -59,6 +67,24 @@ export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0
       </AnimatePresence>
 
       <div className="flex items-center gap-4">
+        {showSettings ? (
+          <div className="flex items-center gap-2 bg-black/40 p-1 rounded-md">
+            <input 
+              type="text" 
+              value={ipValue} 
+              onChange={(e) => setIpValue(e.target.value)}
+              className="bg-transparent text-white text-xs px-2 outline-none w-32 font-mono"
+              placeholder="192.168.1.1:8000"
+            />
+            <button onClick={handleSaveIp} className="text-xs bg-blue-600 px-2 py-1 rounded font-bold text-white">Kaydet</button>
+            <button onClick={() => setShowSettings(false)} className="text-xs px-2 text-white/70 hover:text-white">İptal</button>
+          </div>
+        ) : (
+          <button onClick={() => setShowSettings(true)} className="text-white/70 hover:text-white transition-colors">
+            <Settings size={18} />
+          </button>
+        )}
+
         {/* Pending sync count */}
         {pendingSyncCount > 0 && (
           <motion.div
