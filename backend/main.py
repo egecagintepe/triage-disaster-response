@@ -117,7 +117,6 @@ async def lifespan(app: FastAPI):
         await session.execute(text("DELETE FROM tasks"))
         await session.execute(text("DELETE FROM zones"))
         await session.execute(text("DELETE FROM system_events"))
-        await session.execute(text("DELETE FROM sync_logs"))
         await session.execute(text("DELETE FROM teams"))
         await session.commit()
     print("[OK] Database purged for fresh demo start")
@@ -201,7 +200,6 @@ async def clear_database():
         await session.execute(text("DELETE FROM tasks"))
         await session.execute(text("DELETE FROM zones"))
         await session.execute(text("DELETE FROM system_events"))
-        await session.execute(text("DELETE FROM sync_logs"))
         await session.execute(text("DELETE FROM teams"))
         await session.commit()
     

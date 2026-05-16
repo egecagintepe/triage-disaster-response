@@ -177,7 +177,8 @@ async def fetch_latest_earthquake() -> dict:
 
     # 1. Fetch Kandilli
     def in_turkey(lat: float, lng: float) -> bool:
-        return 35.5 <= lat <= 42.5 and 25.5 <= lng <= 45.5
+        # STRICT Turkey bounding box — anything outside is silently dropped
+        return 35.0 <= lat <= 43.0 and 25.0 <= lng <= 45.0
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -188,44 +189,49 @@ async def fetch_latest_earthquake() -> dict:
                 coords = eq.get("geojson", {}).get("coordinates", [0, 0])
                 lat = float(coords[1])
                 lng = float(coords[0])
-                if not in_turkey(lat, lng):
-                    continue
-                
-                title = eq.get("location_properties", {}).get("epiCenter", {}).get("name") or eq.get("title", "Bilinmeyen")
-                events.append({
-                    "id": eq.get("earthquake_id", f"KANDILLI-{eq.get('date_time', '')}"),
-                    "mag": float(eq.get("mag", 0.0)),
-                    "depth": float(eq.get("depth", 0.0)),
-                    "lat": lat,
-                    "lng": lng,
-                    "title": title,
-                    "date": eq.get("date_time", ""),
-                    "source": "AFAD/Kandilli",
-                    "closestCities": eq.get("location_properties", {}).get("closestCities", [])
-                })
+                if in_turkey(lat, lng):
+                    title = eq.get("location_properties", {}).get("epiCenter", {}).get("name") or eq.get("title", "Bilinmeyen")
+                    events.append({
+                        "id": eq.get("earthquake_id", f"KANDILLI-{eq.get('date_time', '')}"),
+                        "mag": float(eq.get("mag", 0.0)),
+                        "depth": float(eq.get("depth", 0.0)),
+                        "lat": lat,
+                        "lng": lng,
+                        "title": title,
+                        "date": eq.get("date_time", ""),
+                        "source": "AFAD/Kandilli",
+                        "closestCities": eq.get("location_properties", {}).get("closestCities", [])
+                    })
     except Exception as e:
         print(f"[KANDILLI] API error: {e}")
 
     # 2. Fetch USGS
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=3")
+            res = await client.get(
+                "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=5",
+                headers={"User-Agent": "Mozilla/5.0 (TRIAGE-V2 Earthquake Monitor)"}
+            )
             data = res.json().get("features", [])
             for f in data:
                 prop = f["properties"]
                 geom = f["geometry"]["coordinates"]
-                lat = float(geom[1])
+                # GeoJSON spec: coordinates = [Longitude, Latitude, Depth]
                 lng = float(geom[0])
+                lat = float(geom[1])
+                depth = float(geom[2]) if len(geom) > 2 else 10.0
+                # STRICT Turkey guardrail — drop anything outside Turkey
                 if not in_turkey(lat, lng):
                     continue
 
+                raw_place = prop.get("place", "Unknown")
                 events.append({
                     "id": f["id"],
                     "mag": float(prop.get("mag", 0.0)),
-                    "depth": float(geom[2]),
+                    "depth": depth,
                     "lat": lat,
                     "lng": lng,
-                    "title": prop.get("place", "Unknown"),
+                    "title": f"{raw_place} (USGS)",
                     "date": __import__('datetime').datetime.fromtimestamp(prop.get("time", 0)/1000, tz=timezone.utc).isoformat(),
                     "source": "USGS",
                     "closestCities": []
@@ -236,26 +242,29 @@ async def fetch_latest_earthquake() -> dict:
     # 3. Fetch EMSC
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get("https://www.seismicportal.eu/fdsnws/event/1/query?format=json&limit=3")
+            res = await client.get(
+                "https://www.seismicportal.eu/fdsnws/event/1/query?format=json&limit=5",
+                headers={"User-Agent": "Mozilla/5.0 (TRIAGE-V2 Earthquake Monitor)"}
+            )
             data = res.json().get("features", [])
             for f in data:
                 prop = f["properties"]
                 geom = f["geometry"]["coordinates"]
-                lat = float(geom[1])
+                # GeoJSON spec: coordinates = [Longitude, Latitude, Depth]
                 lng = float(geom[0])
+                lat = float(geom[1])
+                # STRICT Turkey guardrail — drop anything outside Turkey
                 if not in_turkey(lat, lng):
                     continue
-                
-                raw_region = prop.get("flynn_region", "Unknown")
-                title = raw_region
-                    
+
+                raw_region = prop.get("flynn_region") or prop.get("region", "Unknown")
                 events.append({
                     "id": prop.get("unid"),
                     "mag": float(prop.get("mag", 0.0)),
                     "depth": float(prop.get("depth", 0.0)),
                     "lat": lat,
                     "lng": lng,
-                    "title": title,
+                    "title": f"{raw_region} (EMSC)",
                     "date": prop.get("time", ""),
                     "source": "EMSC",
                     "closestCities": []
@@ -283,9 +292,10 @@ async def fetch_latest_earthquake() -> dict:
             merged.append(ev)
 
     best_eq = merged[0] if merged else events[0]
-    
-    if not (35.5 <= best_eq["lat"] <= 42.5 and 25.5 <= best_eq["lng"] <= 45.5):
-        print(f"[FILTER] Dropped earthquake outside Turkey: {best_eq['title']} ({best_eq['lat']}, {best_eq['lng']})")
+
+    # FINAL strict Turkey guardrail — ironclad check before building the result
+    if not (35.0 <= best_eq["lat"] <= 43.0 and 25.0 <= best_eq["lng"] <= 45.0):
+        print(f"[FILTER] Dropped earthquake outside Turkey: {best_eq['title']} ({best_eq['lat']:.4f}, {best_eq['lng']:.4f})")
         return {}
     
     magnitude = best_eq["mag"]
@@ -309,12 +319,13 @@ async def fetch_latest_earthquake() -> dict:
         ),
     }
 
-    # Rolling Window of 50
+    # Rolling Window of 50 — strict deduplication by ID, newest first
     global _earthquake_window
-    if not any(e["earthquake_id"] == earthquake["earthquake_id"] for e in _earthquake_window):
+    eq_id_str = str(earthquake["earthquake_id"])
+    if not any(str(e["earthquake_id"]) == eq_id_str for e in _earthquake_window):
         _earthquake_window.insert(0, earthquake)
-        if len(_earthquake_window) > 50:
-            _earthquake_window.pop()
+        # Trim to exactly 50 unique events
+        _earthquake_window = _earthquake_window[:50]
 
     print(
         f"[POLL] Live earthquake: M{magnitude} {best_eq['title']} "
