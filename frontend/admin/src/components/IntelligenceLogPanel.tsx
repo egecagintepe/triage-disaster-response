@@ -6,7 +6,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { IntelligenceLog, LogType } from "../types";
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft, CheckCircle2, Bot } from "lucide-react";
+import { useTaskStore } from "../stores/taskStore";
+import { updateTaskLocal } from "../services/localDb";
 
 interface Props {
   logs: IntelligenceLog[];
@@ -23,6 +25,12 @@ interface Props {
  */
 export default function IntelligenceLogPanel({ logs }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const tasks = useTaskStore((s) => s.tasks);
+  const pendingAiTasks = tasks.filter((t) => t.status === "pending_approval");
+
+  const handleApprove = async (taskId: number) => {
+    await updateTaskLocal(taskId, { status: "pending" });
+  };
 
   return (
     <>
@@ -49,8 +57,10 @@ export default function IntelligenceLogPanel({ logs }: Props) {
         <span className="text-[9px] font-mono text-emerald-500 animate-pulse">● LIVE</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col-reverse justify-end h-full scrollbar-none">
-        <AnimatePresence initial={false}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col-reverse h-full scrollbar-none">
+        {/* LOGS (reverse order) */}
+        <div className="flex flex-col-reverse gap-3 mt-4">
+          <AnimatePresence initial={false}>
           {logs.map((log) => {
             let textColor = "text-gray-50";
             let borderColor = "border-white/5";
@@ -94,7 +104,46 @@ export default function IntelligenceLogPanel({ logs }: Props) {
           })}
         </AnimatePresence>
         
-        {logs.length === 0 && (
+        </div>
+
+        {/* AI APPROVAL QUEUE (top) */}
+        {pendingAiTasks.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest border-b border-blue-500/20 pb-1 flex items-center gap-1">
+              <Bot className="h-3 w-3" />
+              AI Görev Onayı Bekliyor ({pendingAiTasks.length})
+            </div>
+            <AnimatePresence>
+              {pendingAiTasks.map((task) => (
+                <motion.div
+                  key={`ai-task-${task.id}`}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+                  <div className="flex justify-between items-start pl-2">
+                    <div>
+                      <p className="text-white text-sm font-bold">{task.address}</p>
+                      <p className="text-blue-200 text-xs mt-1">Öncelik: {task.priority}</p>
+                      <p className="text-gray-400 text-[10px] mt-1 italic">{task.notes}</p>
+                    </div>
+                    <button
+                      onClick={() => handleApprove(task.id)}
+                      className="bg-blue-600 hover:bg-blue-500 text-white rounded p-1.5 transition-colors"
+                      title="Görevi Onayla ve Sahaya Aktar"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+        
+        {logs.length === 0 && pendingAiTasks.length === 0 && (
           <div className="h-full flex items-center justify-center">
             <p className="text-gray-600 font-mono text-xs animate-pulse tracking-tighter">BAĞLANTI_KURULUYOR... VERİ_BEKLENİYOR</p>
           </div>

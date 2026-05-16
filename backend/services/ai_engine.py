@@ -118,6 +118,8 @@ ZONE_ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {
         "analysis_timestamp": {"type": "string"},
+        "confidence_score": {"type": "number"},
+        "reasoning": {"type": "string"},
         "zones": {
             "type": "array",
             "items": {
@@ -128,6 +130,7 @@ ZONE_ANALYSIS_SCHEMA = {
                     "estimated_casualties": {"type": "integer"},
                     "recommended_team_count": {"type": "integer"},
                     "risk_factors": {"type": "string"},
+                    "confidence_score": {"type": "number"},
                 },
                 "required": [
                     "name",
@@ -139,7 +142,7 @@ ZONE_ANALYSIS_SCHEMA = {
             },
         },
     },
-    "required": ["zones"],
+    "required": ["zones", "confidence_score", "reasoning"],
 }
 
 
@@ -217,6 +220,11 @@ Her bölge için şunları hesapla:
 2. estimated_casualties: tahmini etkilenen kişi sayısı
 3. recommended_team_count: önerilen arama-kurtarma ekip sayısı
 4. risk_factors: risk faktörleri açıklaması (Türkçe)
+5. confidence_score: Bu bölge analizi için güven skoru (0.0-1.0 arası)
+
+Ayrıca genel analiz için:
+- confidence_score: Genel analiz güven skoru (0.0-1.0 arası, veri kalitesine göre)
+- reasoning: Kısa bir gerekçe açıklaması (Türkçe, 1-2 cümle)
 
 name alanı bölge adıyla eşleşmeli."""
 
@@ -285,5 +293,50 @@ def generate_fallback_analysis(earthquake_data: dict) -> dict:
 
     return {
         "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
+        "confidence_score": 0.65,
+        "reasoning": "Kural tabanlı çevrimdışı analiz — AI modeline erişilemedi, deterministik hesaplama kullanıldı.",
         "zones": zones,
+    }
+
+
+def offline_rule_based_triage(magnitude: float, depth: float) -> dict:
+    """Emergency offline triage when both Gemini AND network are down.
+    
+    Returns basic task generation parameters based on magnitude/depth only.
+    """
+    if magnitude >= 7.0:
+        priority = "RED"
+        team_count = 5
+        task_types = ["arama_kurtarma", "saglik", "lojistik", "hasar_tespit", "tahliye"]
+        confidence = 0.4
+    elif magnitude >= 6.0:
+        priority = "RED"
+        team_count = 3
+        task_types = ["arama_kurtarma", "hasar_tespit", "saglik"]
+        confidence = 0.5
+    elif magnitude >= 5.0:
+        priority = "YELLOW"
+        team_count = 2
+        task_types = ["hasar_tespit", "saglik"]
+        confidence = 0.6
+    elif magnitude >= 4.0:
+        priority = "YELLOW"
+        team_count = 1
+        task_types = ["hasar_tespit"]
+        confidence = 0.7
+    else:
+        priority = "GREEN"
+        team_count = 1
+        task_types = ["izleme"]
+        confidence = 0.85
+
+    shallow_multiplier = 1.5 if depth <= 10 else 1.0 if depth <= 30 else 0.8
+    team_count = max(1, int(team_count * shallow_multiplier))
+
+    return {
+        "priority": priority,
+        "recommended_team_count": team_count,
+        "task_types": task_types,
+        "confidence_score": confidence,
+        "reasoning": f"Çevrimdışı kural motoru: M{magnitude}, {depth}km derinlik → {priority} öncelik",
     }

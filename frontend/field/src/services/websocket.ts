@@ -163,6 +163,14 @@ class WebSocketManager {
         // Field devices don't track other devices (admin-only concern)
         break;
 
+      case 'EMERGENCY_ALERT':
+        this.handleEmergencyAlert(msg);
+        break;
+
+      case 'EMERGENCY_CLEAR':
+        window.dispatchEvent(new CustomEvent('emergency_clear'));
+        break;
+
       case 'BROADCAST':
         console.log(`[WS] Broadcast: ${msg.message}`);
         break;
@@ -245,6 +253,40 @@ class WebSocketManager {
     // Vibrate on mobile (field-specific)
     if ('vibrate' in navigator) {
       navigator.vibrate([200, 100, 200]);
+    }
+  }
+
+  private handleEmergencyAlert(msg: Record<string, unknown>): void {
+    // Dispatch event for UI overlay
+    window.dispatchEvent(new CustomEvent('emergency_alert', { detail: msg }));
+
+    // Vibrate aggressively
+    if ('vibrate' in navigator) {
+      navigator.vibrate([500, 200, 500, 200, 500]);
+    }
+
+    // Play synthetic alarm beep via Web Audio API (no external files)
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playBeep = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'square';
+        gain.gain.setValueAtTime(0.3, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      // Siren pattern: alternating frequencies
+      for (let i = 0; i < 6; i++) {
+        playBeep(880, ctx.currentTime + i * 0.4, 0.2);
+        playBeep(660, ctx.currentTime + i * 0.4 + 0.2, 0.2);
+      }
+    } catch (e) {
+      console.error('[WS] Audio beep failed:', e);
     }
   }
 

@@ -32,6 +32,7 @@ export default function App() {
 
   const isOnline = useOnlineStatus();
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [emergencyAlert, setEmergencyAlert] = useState<{ message: string; severity: string } | null>(null);
 
   // Active task = first pending/assigned/in_progress task for this device
   const activeTask: Task | undefined = tasks.find(
@@ -106,6 +107,21 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  // --- Emergency alert listener ---
+  useEffect(() => {
+    const handleAlert = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setEmergencyAlert({ message: detail.message, severity: detail.severity });
+    };
+    const handleClear = () => setEmergencyAlert(null);
+    window.addEventListener('emergency_alert', handleAlert);
+    window.addEventListener('emergency_clear', handleClear);
+    return () => {
+      window.removeEventListener('emergency_alert', handleAlert);
+      window.removeEventListener('emergency_clear', handleClear);
+    };
+  }, []);
+
   // --- Action handlers (wire to Zustand → Dexie → SyncQueue) ---
   const handleArrived = useCallback(async () => {
     if (!activeTask) return;
@@ -134,6 +150,23 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-black overflow-hidden font-sans">
+      {/* Emergency Alert Overlay */}
+      {emergencyAlert && (
+        <div className="fixed inset-0 z-[99999] bg-red-700 flex flex-col items-center justify-center animate-pulse">
+          <div className="text-white text-center p-8">
+            <div className="text-8xl mb-6">🚨</div>
+            <h1 className="text-4xl font-black uppercase tracking-wider mb-4">KIRMIZI ALARM</h1>
+            <p className="text-xl font-bold mb-8">{emergencyAlert.message}</p>
+            <button
+              onClick={() => setEmergencyAlert(null)}
+              className="px-8 py-4 bg-white text-red-700 font-black text-lg rounded-2xl uppercase tracking-wider"
+            >
+              Anlaşıldı — Kapat
+            </button>
+          </div>
+        </div>
+      )}
+
       <StatusBar
         isOnline={isOnline}
         pendingSyncCount={pendingSyncCount}

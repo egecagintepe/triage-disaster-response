@@ -72,6 +72,11 @@ export default defineConfig(({mode}) => {
             },
           ],
         },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+          navigateFallback: 'index.html',
+        },
       }),
     ],
     define: {

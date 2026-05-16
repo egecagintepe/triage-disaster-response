@@ -158,6 +158,9 @@ app.include_router(teams_router)
 app.include_router(zones_router)
 app.include_router(admin_router)
 
+from routes.emergency import router as emergency_router
+app.include_router(emergency_router)
+
 
 @app.get("/health", tags=["system"])
 async def health_check():

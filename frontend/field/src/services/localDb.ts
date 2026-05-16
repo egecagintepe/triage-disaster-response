@@ -17,7 +17,7 @@ export interface Task {
   id: number;
   zone_id: number;
   assigned_team_id: number | null;
-  status: 'pending' | 'assigned' | 'in_progress' | 'needs_backup' | 'false_alarm' | 'resolved';
+  status: 'pending_approval' | 'pending' | 'assigned' | 'in_progress' | 'needs_backup' | 'false_alarm' | 'resolved';
   priority: 'RED' | 'YELLOW' | 'GREEN';
   lat: number;
   lng: number;

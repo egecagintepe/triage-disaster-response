@@ -125,7 +125,7 @@ async def generate_from_analysis(
             task = Task(
                 zone_id=zone.id,
                 priority=priority_class,
-                status="pending",
+                status="pending_approval",
                 lat=zone_lat + lat_off,
                 lng=zone_lng + lng_off,
                 address=f"{zone_name}, Bölge {i + 1}",

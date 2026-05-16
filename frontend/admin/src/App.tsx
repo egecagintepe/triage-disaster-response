@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import MapPanel from "./components/MapPanel";
 import IntelligenceLogPanel from "./components/IntelligenceLogPanel";
+import OpsHeader from "./components/OpsHeader";
 import Login from "./pages/Login";
 import { IntelligenceLog, LogType, FieldUnit, RiskZone, UnitStatus, ZoneType, ToolMode } from "./types";
 import { useTaskStore } from "./stores/taskStore";
@@ -226,6 +227,11 @@ export default function App() {
 
   return (
     <div className="relative h-screen w-screen bg-black text-gray-50 overflow-hidden font-sans">
+      <OpsHeader
+        isOnline={isOnline}
+        teamCount={storeTeams.length}
+        taskCount={storeTasks.filter(t => t.status !== 'resolved' && t.status !== 'false_alarm').length}
+      />
       <MapPanel
         units={units}
         riskZones={zones}
