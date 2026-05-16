@@ -1947,15 +1947,15 @@ Offline fallback ekle
 
 ### 13.3 Entegrasyon Checklist (Her uygulama için)
 
-- [ ] Uygulama `frontend/` altına taşındı
-- [ ] API client servisi eklendi (api.ts)
-- [ ] WebSocket client servisi eklendi (websocket.ts)
-- [ ] Zustand store'lar oluşturuldu
-- [ ] Mock data → API/store verisi geçişi yapıldı
-- [ ] Offline-first sync queue entegre edildi
-- [ ] Error handling eklendi
-- [ ] Connection status göstergesi bağlandı
-- [ ] Offline mode test edildi
+- [X] Uygulama `frontend/` altına taşındı
+- [X] API client servisi eklendi (api.ts)
+- [X] WebSocket client servisi eklendi (websocket.ts)
+- [X] Zustand store'lar oluşturuldu
+- [X] Mock data → API/store verisi geçişi yapıldı
+- [X] Offline-first sync queue entegre edildi
+- [X] Error handling eklendi
+- [X] Connection status göstergesi bağlandı
+- [X] Offline mode test edildi
 
 
 ---
@@ -2411,13 +2411,13 @@ async def websocket_endpoint(websocket: WebSocket, device_id: str):
 
 ### 18.3 Security Checklist
 
-- [ ] JWT tokens expire ve refresh mekanizması
-- [ ] SQL injection koruması (Pydantic validation)
-- [ ] XSS koruması (React otomatik escape)
-- [ ] CSRF token (gerekirse)
-- [ ] Rate limiting (DDoS koruması)
-- [ ] HTTPS (production'da zorunlu)
-- [ ] Sensitive data encryption (şifreler vb.)
+- [X] JWT tokens expire ve refresh mekanizması
+- [X] SQL injection koruması (Pydantic validation)
+- [X] XSS koruması (React otomatik escape)
+- [X] CSRF token (gerekirse)
+- [X] Rate limiting (DDoS koruması)
+- [X] HTTPS (production'da zorunlu)
+- [X] Sensitive data encryption (şifreler vb.)
 
 ---
 

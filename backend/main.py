@@ -51,6 +51,10 @@ app.add_middleware(
 # GZip compression for large sync payloads
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Rate limiting for auth + admin endpoints
+from middleware.rate_limit import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware)
+
 # Register routers
 app.include_router(auth_router)
 app.include_router(tasks_router)
