@@ -217,24 +217,36 @@ async def analyze_with_gemini(
         return {
             "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
             "confidence_score": 1.0,
-            "reasoning": f"Büyüklük 4.0'ın altında (M{mag}). Fiziksel limit uygulandı.",
+            "reasoning": "4.0 şiddeti altındaki sarsıntılar fiziksel hasar yaratmaz. Sadece gözlem amaçlıdır.",
             "zones": [{
                 "name": earthquake_data.get('location', 'Merkez'),
                 "lat": earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)),
                 "lng": earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)),
-                "radius_m": impact_radius_km * 1000,
+                "radius_m": 2000,
                 "risk_level": "DÜŞÜK",
                 "priority_score": 1.0,
                 "estimated_casualties": 0,
                 "recommended_team_count": 1,
-                "risk_factors": "Düşük büyüklük",
-                "polygon_coordinates": []
+                "risk_factors": "Düşük büyüklük, hasar beklenmiyor.",
+                "polygon_coordinates": [[
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) - 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) - 0.01
+                ], [
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) + 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) - 0.01
+                ], [
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) + 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) + 0.01
+                ], [
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) - 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) + 0.01
+                ]]
             }],
             "tasks": [{
                 "zone_name": earthquake_data.get('location', 'Merkez'),
                 "action_type": "Gözlem",
                 "priority": "DÜŞÜK",
-                "description": "Gözlem ve Raporlama",
+                "description": "Halkı sakinleştirme ve rutin devriye.",
                 "required_teams": 1
             }]
         }
@@ -300,7 +312,10 @@ Yukarıdaki sismik verilere ve {impact_radius_km} km etki yarıçapına (R = e^(
 ÖNEMLİ COĞRAFİ KURAL: 'polygon_coordinates' için asla kare veya düzgün altıgen çizmeyin! Sismik dalga yayılımını ve gerçek coğrafyayı taklit eden, merkez üssü etrafında en az 6-8 noktadan oluşan, asimetrik, eliptik veya organik çokgen koordinatları ([lat, lng] formatında) üretin.
 ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK". İngilizce kelime kullanmayın. YAPAY ZEKA ASLA 'YELLOW' veya 'GREEN' KULLANMAMALIDIR!
 
-You MUST generate an ABSOLUTE MAXIMUM of 3 Risk Zones and a TOTAL MAXIMUM of 5 Tasks per earthquake, regardless of the population density. Focus only on the absolute epicenter.
+RULE 1: You MUST generate EXACTLY ONE (1) Risk Zone polygon. This polygon must be centered around the epicenter. DO NOT create multiple scattered zones.
+RULE 2: You MUST generate an ABSOLUTE MAXIMUM of 3 Tasks within this single zone. Consolidate needs into major operations.
+RULE 3: Priority MUST scale with magnitude. Do NOT output KRİTİK for anything under Mag 6.0, regardless of population.
+
 Parse the epicenter location string. Translate and format it into a clean Turkish format (e.g., 'Anza, Kaliforniya (USGS)'). Do not use 'Bilinmeyen Bölge'.
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:

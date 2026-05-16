@@ -176,7 +176,7 @@ from pydantic import BaseModel
 class MockEarthquake(BaseModel):
     lat: float = 38.4
     lng: float = 27.1
-    magnitude: float = 6.5
+    magnitude: float = 6.8
     depth: float = 10.0
     city: str = "İzmir (Demo)"
 
