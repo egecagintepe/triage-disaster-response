@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { AlertTriangle, QrCode, Clock, Users, Radio, X, Brain, Download, Zap } from "lucide-react";
+import { AlertTriangle, QrCode, Clock, Users, Radio, X, Brain, Download, Zap, Trash2 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { api } from "../services/api";
 import { toast } from "sonner";
@@ -199,6 +199,25 @@ export default function OpsHeader({ isOnline, teamCount, taskCount, logs = [] }:
 
         {/* Right: Tools */}
         <div className="flex items-center gap-2">
+          {/* Phase 2: Nuke DB */}
+          <button
+            onClick={async () => {
+              if (window.confirm("Tüm veritabanı SIFIRLANACAKTIR! Onaylıyor musunuz?")) {
+                try {
+                  await api.post("/api/debug/clear-database", {});
+                  toast.success("Veritabanı sıfırlandı!");
+                  window.location.reload();
+                } catch (e) {
+                  toast.error("Temizleme başarısız!");
+                }
+              }
+            }}
+            className="p-1.5 rounded-md bg-red-950/30 border border-red-500/20 hover:bg-red-900/50 transition-colors text-red-400 hover:text-white"
+            title="Verileri Temizle"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+
           {/* Phase 6: Auto-Dispatch */}
           <button
             onClick={handleAutoDispatch}

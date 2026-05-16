@@ -58,6 +58,43 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
     return task
 
 
+@router.post("/approve-all", status_code=200)
+async def approve_all_tasks(db: AsyncSession = Depends(get_db)):
+    """Phase 3: Bulk Approval Endpoint"""
+    from sqlalchemy import update
+    stmt = update(Task).where(Task.status == 'pending_approval').values(
+        status='pending',
+        updated_at=datetime.now(timezone.utc)
+    ).returning(Task)
+    
+    result = await db.execute(stmt)
+    updated_tasks = result.scalars().all()
+    await db.commit()
+    
+    # Auto-assign if there are idle teams
+    assignments = await assign_pending_tasks(db)
+    if assignments:
+        await broadcast_assignments(assignments)
+        
+    try:
+        from main import ws_manager
+        # Tell frontend to reload tasks or broadcast each updated task
+        for task in updated_tasks:
+            await ws_manager.broadcast_task_update({
+                "id": task.id,
+                "status": task.status,
+                "assigned_team_id": task.assigned_team_id,
+                "priority": task.priority,
+                "address": task.address,
+                "lat": task.lat,
+                "lng": task.lng,
+            })
+    except Exception as e:
+        print(f"[WS] Error broadcasting bulk update: {e}")
+
+    return {"status": "ok", "approved_count": len(updated_tasks)}
+
+
 @router.post("", response_model=TaskResponse, status_code=201)
 async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
     """Create a new task."""

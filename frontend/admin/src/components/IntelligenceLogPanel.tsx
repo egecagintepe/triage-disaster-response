@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { IntelligenceLog, LogType } from "../types";
 import { ChevronRight, ChevronLeft, CheckCircle2, Bot } from "lucide-react";
 import { useTaskStore } from "../stores/taskStore";
+import { api } from "../services/api";
 
 interface Props {
   logs: IntelligenceLog[];
@@ -108,9 +109,24 @@ export default function IntelligenceLogPanel({ logs }: Props) {
         {/* AI APPROVAL QUEUE (top) */}
         {pendingAiTasks.length > 0 && (
           <ul className="mb-4 space-y-2">
-            <div className="text-[11px] font-bold text-blue-400 uppercase tracking-tighter border-b border-zinc-800 pb-1 flex items-center gap-1">
-              <Bot className="h-3 w-3" />
-              AI Görev Onayı Bekliyor ({pendingAiTasks.length})
+            <div className="text-[11px] font-bold text-blue-400 uppercase tracking-tighter border-b border-zinc-800 pb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <Bot className="h-3 w-3" />
+                AI Görev Onayı Bekliyor ({pendingAiTasks.length})
+              </span>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.post("/api/v1/tasks/approve-all");
+                  } catch (e) {
+                    console.error("Bulk approve failed", e);
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded text-[9px] uppercase font-black tracking-widest shadow-[0_0_10px_rgba(37,99,235,0.4)] transition-all"
+                title="Tüm görevleri onayla ve sahaya aktar"
+              >
+                TÜMÜNÜ ONAYLA
+              </button>
             </div>
             <AnimatePresence>
               {pendingAiTasks.map((task) => {

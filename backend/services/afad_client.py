@@ -266,6 +266,10 @@ async def fetch_latest_earthquake() -> dict:
 
     best_eq = merged[0] if merged else events[0]
     
+    if not (35.5 <= best_eq["lat"] <= 42.5 and 25.5 <= best_eq["lng"] <= 45.5):
+        print(f"[FILTER] Dropped earthquake outside Turkey: {best_eq['title']} ({best_eq['lat']}, {best_eq['lng']})")
+        return {}
+    
     magnitude = best_eq["mag"]
     lat = best_eq["lat"]
     lng = best_eq["lng"]

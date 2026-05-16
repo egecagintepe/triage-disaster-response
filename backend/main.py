@@ -86,6 +86,14 @@ async def _autonomous_triage_loop():
                     if assignments:
                         await broadcast_assignments(assignments)
                         print(f"[AI-LOOP] Auto-assigned {len(assignments)} tasks")
+
+                # Phase 5: Autonomous Emergency Alert
+                if mag >= 6.0:
+                    alert_msg = f"{loc} bölgesinde {mag} şiddetinde şiddetli deprem meydana gelmiştir! Tüm saha birimleri acil durum moduna geçsin."
+                    await ws_manager.broadcast({
+                        "type": "EMERGENCY_ALERT",
+                        "message": alert_msg
+                    })
             else:
                 pass  # Same earthquake, skip
 
@@ -169,9 +177,25 @@ from routes.emergency import router as emergency_router
 app.include_router(emergency_router)
 
 
-# ---- PHASE 2: God Mode Debug Injector ----
+# ---- PHASE 2: God Mode Debug Injector & Clear DB ----
 from fastapi import Body
 from pydantic import BaseModel
+import random
+
+@app.post("/api/debug/clear-database", tags=["debug"])
+async def clear_database():
+    """PHASE 2: Nuke Endpoint"""
+    from sqlalchemy import text
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM tasks"))
+        await session.execute(text("DELETE FROM zones"))
+        await session.execute(text("DELETE FROM system_events"))
+        await session.execute(text("DELETE FROM sync_logs"))
+        await session.execute(text("DELETE FROM teams"))
+        await session.commit()
+    
+    await ws_manager.broadcast({"type": "BROADCAST", "message": "Sistem Veritabanı Temizlendi."})
+    return {"status": "cleared"}
 
 class MockEarthquake(BaseModel):
     lat: float = 38.4
@@ -181,7 +205,7 @@ class MockEarthquake(BaseModel):
     city: str = "İzmir (Demo)"
 
 @app.post("/api/debug/inject-earthquake", tags=["debug"])
-async def inject_earthquake(eq: MockEarthquake = Body(...)):
+async def inject_earthquake(eq: MockEarthquake = Body(None)):
     """God Mode: Inject a mock earthquake for live demo."""
     from services.ai_engine import analyze_with_gemini, generate_fallback_analysis
     from services.task_generator import generate_from_analysis
@@ -189,20 +213,37 @@ async def inject_earthquake(eq: MockEarthquake = Body(...)):
     from services.seismology import calculate_rupture_length, predict_aftershocks
     from services.afad_client import _generate_affected_regions
 
-    affected = _generate_affected_regions(eq.lat, eq.lng, eq.magnitude, eq.city, [])
+    # Phase 4: Randomized Presentation Simulator
+    cities = [
+        {"city": "İzmir", "lat": 38.42, "lng": 27.14},
+        {"city": "İstanbul", "lat": 40.98, "lng": 28.74},
+        {"city": "Hatay", "lat": 36.20, "lng": 36.16},
+        {"city": "Erzincan", "lat": 39.75, "lng": 39.49},
+        {"city": "Kahramanmaraş", "lat": 37.57, "lng": 36.92},
+    ]
+    chosen = random.choice(cities)
+    mag = round(random.uniform(5.8, 7.4), 1)
+    
+    eq_lat = chosen["lat"]
+    eq_lng = chosen["lng"]
+    eq_magnitude = mag
+    eq_depth = random.uniform(5.0, 15.0)
+    eq_city = chosen["city"]
+
+    affected = _generate_affected_regions(eq_lat, eq_lng, eq_magnitude, eq_city, [])
 
     mock_data = {
         "earthquake_id": f"DEMO-{int(__import__('time').time())}",
-        "magnitude": eq.magnitude,
-        "depth_km": eq.depth,
-        "location": eq.city,
-        "lat": eq.lat,
-        "lng": eq.lng,
-        "epicenter": {"lat": eq.lat, "lng": eq.lng},
+        "magnitude": eq_magnitude,
+        "depth_km": eq_depth,
+        "location": eq_city,
+        "lat": eq_lat,
+        "lng": eq_lng,
+        "epicenter": {"lat": eq_lat, "lng": eq_lng},
         "affected_regions": affected,
         "date": __import__('datetime').datetime.now().isoformat(),
-        "rupture_length_km": calculate_rupture_length(eq.magnitude),
-        "estimated_aftershocks": predict_aftershocks(time_since_mainshock_hours=1.0, magnitude=eq.magnitude)
+        "rupture_length_km": calculate_rupture_length(eq_magnitude),
+        "estimated_aftershocks": predict_aftershocks(time_since_mainshock_hours=1.0, magnitude=eq_magnitude)
     }
 
     # AI Analysis (Gemini or fallback)
@@ -222,7 +263,7 @@ async def inject_earthquake(eq: MockEarthquake = Body(...)):
     # Broadcast everything
     await ws_manager.broadcast({
         "type": "BROADCAST",
-        "message": f"🚨 SİMÜLASYON: M{eq.magnitude} {eq.city} — {result['zones_created']} bölge, {result['tasks_created']} görev ({method})",
+        "message": f"🚨 SİMÜLASYON: M{eq_magnitude} {eq_city} — {result['zones_created']} bölge, {result['tasks_created']} görev ({method})",
     })
     for task_data in result.get("tasks", []):
         await ws_manager.broadcast({"type": "NEW_TASK", "data": task_data})
@@ -230,6 +271,14 @@ async def inject_earthquake(eq: MockEarthquake = Body(...)):
         await ws_manager.broadcast({"type": "ZONE_UPDATE", "data": zone_data})
     if assignments:
         await broadcast_assignments(assignments)
+        
+    # Phase 5: Autonomous Emergency Alert
+    if eq_magnitude >= 6.0:
+        alert_msg = f"{eq_city} bölgesinde {eq_magnitude} şiddetinde şiddetli deprem meydana gelmiştir! Tüm saha birimleri acil durum moduna geçsin."
+        await ws_manager.broadcast({
+            "type": "EMERGENCY_ALERT",
+            "message": alert_msg
+        })
 
     return {
         "status": "injected",
