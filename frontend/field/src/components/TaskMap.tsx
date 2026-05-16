@@ -1,7 +1,16 @@
-import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+  RED:    { bg: 'bg-red-500/20',    text: 'text-red-500',     label: 'YÜKSEK' },
+  YELLOW: { bg: 'bg-amber-500/20',  text: 'text-amber-500',   label: 'ORTA' },
+  GREEN:  { bg: 'bg-emerald-500/20', text: 'text-emerald-500', label: 'DÜŞÜK' },
+  // Legacy Turkish values
+  'Yüksek': { bg: 'bg-red-500/20',    text: 'text-red-500',     label: 'YÜKSEK' },
+  'Orta':   { bg: 'bg-amber-500/20',  text: 'text-amber-500',   label: 'ORTA' },
+  'Düşük':  { bg: 'bg-emerald-500/20', text: 'text-emerald-500', label: 'DÜŞÜK' },
+};
 
 // Fix for default marker icon in Leaflet + Vite
 const customIcon = L.divIcon({
@@ -34,9 +43,21 @@ interface TaskMapProps {
   userLng: number | null;
   address: string;
   priority: string;
+  status?: string;
 }
 
-export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, priority }: TaskMapProps) {
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'BEKLİYOR',
+  assigned: 'ATANDI',
+  in_progress: 'DEVAM EDİYOR',
+  needs_backup: 'DESTEK GEREKLİ',
+  false_alarm: 'YANLIŞ ALARM',
+  resolved: 'TAMAMLANDI',
+};
+
+export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, priority, status }: TaskMapProps) {
+  const prio = PRIORITY_COLORS[priority] || PRIORITY_COLORS['RED'];
+
   return (
     <div className="relative h-[40vh] shadow-2xl rounded-b-3xl overflow-hidden z-0">
       <MapContainer 
@@ -72,12 +93,15 @@ export default function TaskMap({ taskLat, taskLng, userLat, userLng, address, p
         <h2 className="text-white text-lg font-extrabold leading-tight tracking-tight">
           {address}
         </h2>
-        <div className="flex items-center mt-2">
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-            priority === 'Yüksek' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500'
-          }`}>
-            Aciliyet: {priority}
+        <div className="flex items-center gap-2 mt-2">
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${prio.bg} ${prio.text}`}>
+            Aciliyet: {prio.label}
           </span>
+          {status && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400">
+              {STATUS_LABELS[status] ?? status}
+            </span>
+          )}
         </div>
       </div>
     </div>

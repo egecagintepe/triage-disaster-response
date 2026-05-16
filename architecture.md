@@ -1812,13 +1812,13 @@ triage-v2/
 **Çıktı:** Admin dashboard operasyonel ✅
 
 #### Sprint 2.3: Mobile Field App
-- [ ] Active task card
-- [ ] Navigation map
-- [ ] Action buttons (3 büyük buton)
-- [ ] Offline indicator
-- [ ] Task status update
+- [X] Active task card
+- [X] Navigation map
+- [X] Action buttons (3 büyük buton)
+- [X] Offline indicator
+- [X] Task status update
 
-**Çıktı:** Saha uygulaması kullanılabilir
+**Çıktı:** Field app operasyonel, offline-first çalışıyor ✅
 
 ---
 
