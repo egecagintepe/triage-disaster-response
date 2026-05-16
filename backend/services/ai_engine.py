@@ -5,6 +5,7 @@ Falls back to rule-based scoring when Gemini is unavailable.
 """
 
 import json
+import math
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -111,6 +112,27 @@ def estimate_team_count(score: float, population: int = 0) -> int:
     return base
 
 
+def calculate_impact_radius(magnitude: float, depth_km: float) -> float:
+    """Calculate the physical impact radius in km using a seismological heuristic.
+    
+    Rule of thumb: 
+    - Radius scales exponentially with magnitude.
+    - Depth modifier: shallow earthquakes (<15km) increase surface impact, deep ones diffuse it.
+    """
+    # Base radius calculation (simplified empirical formula)
+    base_radius = math.pow(10, (magnitude / 2.0) - 0.5) * 5
+    
+    # Depth modifier
+    if depth_km <= 10.0:
+        depth_modifier = 1.4
+    elif depth_km <= 30.0:
+        depth_modifier = 1.0
+    else:
+        depth_modifier = max(0.4, 30.0 / depth_km)
+        
+    return round(base_radius * depth_modifier, 2)
+
+
 # --- Gemini AI Integration (Structured Output) ---
 
 # JSON schema for Gemini's response_schema parameter
@@ -126,107 +148,114 @@ ZONE_ANALYSIS_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
+                    "lat": {"type": "number"},
+                    "lng": {"type": "number"},
+                    "radius_m": {"type": "number"},
+                    "risk_level": {"type": "string"},
                     "priority_score": {"type": "number"},
                     "estimated_casualties": {"type": "integer"},
                     "recommended_team_count": {"type": "integer"},
                     "risk_factors": {"type": "string"},
-                    "confidence_score": {"type": "number"},
                 },
                 "required": [
-                    "name",
-                    "priority_score",
-                    "estimated_casualties",
-                    "recommended_team_count",
-                    "risk_factors",
+                    "name", "lat", "lng", "radius_m", "risk_level",
+                    "priority_score", "estimated_casualties", "recommended_team_count", "risk_factors"
                 ],
             },
         },
+        "tasks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "zone_name": {"type": "string"},
+                    "action_type": {"type": "string"},
+                    "priority": {"type": "string"},
+                    "description": {"type": "string"},
+                    "required_teams": {"type": "integer"},
+                },
+                "required": ["zone_name", "action_type", "priority", "description"],
+            },
+        },
     },
-    "required": ["zones", "confidence_score", "reasoning"],
+    "required": ["zones", "tasks", "confidence_score", "reasoning"],
 }
 
 
 async def analyze_with_gemini(
     earthquake_data: dict,
     zones_data: list[dict],
-) -> Optional[dict]:
+) -> dict:
     """Use Gemini API with structured JSON output to analyze earthquake data.
 
-    Args:
-        earthquake_data: Dict with magnitude, depth, epicenter, affected_regions.
-        zones_data: List of zone dicts with population, building info.
-
-    Returns:
-        Dict with zone priorities and recommended teams, or None if API fails.
+    Calculates impact radius mathematically first, feeds it to the AI prompt.
+    Falls back to offline rule-based triage on any failure.
     """
-    if not GEMINI_API_KEY:
-        print("[AI] No Gemini API key configured, using fallback scoring")
-        return None
+    mag = earthquake_data.get('magnitude', 5.0)
+    depth = earthquake_data.get('depth_km', 10.0)
+    impact_radius_km = calculate_impact_radius(mag, depth)
+
+    if not GEMINI_API_KEY or GEMINI_API_KEY.endswith("_here"):
+        print("[AI] Missing/Invalid Gemini API key, using offline fallback.")
+        return offline_rule_based_triage(mag, depth)
 
     try:
         import google.generativeai as genai
-
         genai.configure(api_key=GEMINI_API_KEY)
 
-        # Use response_mime_type for strict JSON output
         model = genai.GenerativeModel(
-            "gemini-2.0-flash",
+            "gemini-2.5-flash",
             generation_config=genai.GenerationConfig(
                 response_mime_type="application/json",
                 response_schema=ZONE_ANALYSIS_SCHEMA,
+                temperature=0.2,
             ),
         )
 
-        prompt = _build_analysis_prompt(earthquake_data, zones_data)
-
+        prompt = _build_analysis_prompt(earthquake_data, zones_data, impact_radius_km)
+        print(f"[AI] Calling Gemini API (Impact Radius: {impact_radius_km}km)...")
+        
         response = await model.generate_content_async(prompt)
-        result_text = response.text
+        parsed = json.loads(response.text)
 
-        # With response_mime_type="application/json", output is guaranteed valid JSON
-        parsed = json.loads(result_text)
+        if "zones" not in parsed or "tasks" not in parsed:
+            raise ValueError("Missing 'zones' or 'tasks' in Gemini JSON output")
 
-        # Validate structure
-        if "zones" not in parsed:
-            print("[AI] Gemini response missing 'zones' key")
-            return None
-
-        print(f"[AI] Gemini analysis complete: {len(parsed['zones'])} zones")
+        print(f"[AI] Gemini analysis complete: {len(parsed['zones'])} zones, {len(parsed['tasks'])} tasks")
         return parsed
 
     except Exception as e:
-        print(f"[AI] Gemini API error: {e}")
-        return None
+        print(f"[AI] Gemini API failed: {e}. Falling back to offline triage.")
+        return offline_rule_based_triage(mag, depth)
 
 
-def _build_analysis_prompt(earthquake_data: dict, zones_data: list[dict]) -> str:
-    """Build the analysis prompt for Gemini."""
+def _build_analysis_prompt(earthquake_data: dict, zones_data: list[dict], impact_radius_km: float) -> str:
+    """Build the analysis prompt for Gemini including the calculated impact radius."""
 
-    # Use affected_regions from earthquake_data if available
     regions = earthquake_data.get("affected_regions", zones_data)
+    
+    # Simulate building density/parcel data for the radius
+    simulated_density = int(impact_radius_km * 1200)
 
-    return f"""Sen bir afet yönetimi uzmanısın. Aşağıdaki deprem verilerini analiz et ve her bölge için öncelik skoru belirle.
+    return f"""Sen baş sismolog ve afet yönetimi yapay zeka uzmanısın.
 
 DEPREM VERİLERİ:
 - Büyüklük: {earthquake_data.get('magnitude', 'N/A')}
 - Derinlik: {earthquake_data.get('depth_km', 'N/A')} km
 - Merkez Üssü: {earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 'N/A'))}, {earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 'N/A'))}
-- Tarih: {earthquake_data.get('date', 'N/A')}
+- Hesaplanmış Etki Yarıçapı (Algoritma Çıktısı): {impact_radius_km} km
+- Simüle Edilen Bina Yoğunluğu: Etki alanında yaklaşık {simulated_density} bina.
 
 BÖLGE VERİLERİ:
 {json.dumps(regions, ensure_ascii=False, indent=2)}
 
-Her bölge için şunları hesapla:
-1. priority_score: 1.0-5.0 arası (5.0 en kritik). Episantra yakınlık, eski bina oranı, nüfus yoğunluğu ve zemin tipini dikkate al.
-2. estimated_casualties: tahmini etkilenen kişi sayısı
-3. recommended_team_count: önerilen arama-kurtarma ekip sayısı
-4. risk_factors: risk faktörleri açıklaması (Türkçe)
-5. confidence_score: Bu bölge analizi için güven skoru (0.0-1.0 arası)
+GÖREVİN:
+1. 'zones' dizisini oluştur: Her bölge için episantr mesafesi ve etki yarıçapını kıyaslayarak risk seviyesi (risk_level), öncelik (priority_score: 1.0-5.0), tahmini kayıp (estimated_casualties) ve merkez koordinatlarını (lat, lng) belirle.
+2. 'tasks' dizisini oluştur: Bu bölgelerde yapılması gereken "arama_kurtarma", "hasar_tespit", "lojistik" gibi spesifik görevleri listele.
+3. Genel analiz için 'confidence_score' ve 'reasoning' (1-2 cümle) ekle.
 
-Ayrıca genel analiz için:
-- confidence_score: Genel analiz güven skoru (0.0-1.0 arası, veri kalitesine göre)
-- reasoning: Kısa bir gerekçe açıklaması (Türkçe, 1-2 cümle)
-
-name alanı bölge adıyla eşleşmeli."""
+DÖNÜŞ FORMATI:
+Sadece JSON dön. Şemaya (ZONE_ANALYSIS_SCHEMA) tam olarak uy."""
 
 
 def _parse_gemini_response(text: str) -> Optional[dict]:

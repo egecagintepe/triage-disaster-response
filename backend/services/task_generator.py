@@ -62,29 +62,29 @@ async def generate_from_analysis(
     epicenter_lat = earthquake_data.get("epicenter", {}).get("lat", earthquake_data.get("lat", 38.42))
     epicenter_lng = earthquake_data.get("epicenter", {}).get("lng", earthquake_data.get("lng", 27.13))
 
+    # First pass: Create Zones and keep references
+    zone_refs = {}
     for zone_analysis in analysis.get("zones", []):
         zone_name = zone_analysis["name"]
-        score = zone_analysis["priority_score"]
+        score = zone_analysis.get("priority_score", 1.0)
         estimated_casualties = zone_analysis.get("estimated_casualties", 0)
         recommended_teams = zone_analysis.get("recommended_team_count", 1)
         risk_factors = zone_analysis.get("risk_factors", "")
 
-        # Get coordinates from region data
         region = region_map.get(zone_name, {})
-        zone_lat = region.get("lat", epicenter_lat + random.uniform(-0.05, 0.05))
-        zone_lng = region.get("lng", epicenter_lng + random.uniform(-0.05, 0.05))
+        zone_lat = zone_analysis.get("lat") or region.get("lat", epicenter_lat + random.uniform(-0.05, 0.05))
+        zone_lng = zone_analysis.get("lng") or region.get("lng", epicenter_lng + random.uniform(-0.05, 0.05))
+        radius_m = zone_analysis.get("radius_m", 500)
 
-        # --- Create Zone record with POLYGON geometry (hex around center) ---
-        # Generate hexagonal polygon (~500m radius, scaled by priority)
         import math as _math
-        hex_radius = 0.004 * (score / 3.0)  # ~400-700m depending on priority
+        hex_radius = radius_m / 111000.0  # Approx meters to degrees
         hex_points = []
         for angle_i in range(6):
             angle_rad = _math.radians(60 * angle_i - 30)
             hex_lat = zone_lat + hex_radius * _math.cos(angle_rad)
             hex_lng = zone_lng + hex_radius * _math.sin(angle_rad) / _math.cos(_math.radians(zone_lat))
             hex_points.append([hex_lng, hex_lat])
-        hex_points.append(hex_points[0])  # Close the polygon
+        hex_points.append(hex_points[0])
 
         zone = Zone(
             name=zone_name,
@@ -99,9 +99,18 @@ async def generate_from_analysis(
             infrastructure_risk=round(score * 0.8, 1),
         )
         session.add(zone)
-        await session.flush()  # Get auto-generated ID
+        await session.flush()
 
-        zone_dict = {
+        zone_refs[zone_name] = {
+            "id": zone.id,
+            "score": score,
+            "lat": zone_lat,
+            "lng": zone_lng,
+            "recommended_teams": recommended_teams,
+            "risk_factors": risk_factors
+        }
+
+        zones_created.append({
             "id": zone.id,
             "name": zone.name,
             "priority_score": zone.priority_score,
@@ -110,44 +119,60 @@ async def generate_from_analysis(
             "lng": zone_lng,
             "recommended_teams": recommended_teams,
             "risk_factors": risk_factors,
-        }
-        zones_created.append(zone_dict)
+        })
 
-        # --- Create Task records ---
-        priority_class = classify_priority(score)
-        building_types = ["residential", "commercial", "public", "industrial", "hospital"]
-        damage_levels = _damage_levels_for_score(score)
-        offsets = _generate_offsets(recommended_teams)
-
-        for i in range(recommended_teams):
-            lat_off, lng_off = offsets[i] if i < len(offsets) else (0.0, 0.0)
-
+    # Second pass: Create Tasks
+    ai_tasks = analysis.get("tasks", [])
+    
+    if ai_tasks:
+        # Use AI-generated explicit tasks
+        offsets = _generate_offsets(len(ai_tasks) + 10)
+        for idx, t_data in enumerate(ai_tasks):
+            z_name = t_data.get("zone_name")
+            z_ref = zone_refs.get(z_name)
+            if not z_ref:
+                continue
+                
+            lat_off, lng_off = offsets[idx % len(offsets)]
+            
             task = Task(
-                zone_id=zone.id,
-                priority=priority_class,
+                zone_id=z_ref["id"],
+                priority=t_data.get("priority", "YELLOW").upper(),
                 status="pending_approval",
-                lat=zone_lat + lat_off,
-                lng=zone_lng + lng_off,
-                address=f"{zone_name}, Bölge {i + 1}",
-                building_type=building_types[i % len(building_types)],
-                reported_damage_level=damage_levels[i % len(damage_levels)],
-                notes=f"AI analiz: {risk_factors}" if risk_factors else f"AI tarafından oluşturuldu - {zone_name}",
+                lat=z_ref["lat"] + lat_off,
+                lng=z_ref["lng"] + lng_off,
+                address=f"{z_name} - {t_data.get('action_type', 'Müdahale')}",
+                building_type="unknown",
+                notes=t_data.get("description", ""),
             )
             session.add(task)
             await session.flush()
+            tasks_created.append(_format_task_dict(task))
+    else:
+        # Fallback to algorithmic tasks
+        for zone_name, z_ref in zone_refs.items():
+            priority_class = classify_priority(z_ref["score"])
+            building_types = ["residential", "commercial", "public", "industrial", "hospital"]
+            damage_levels = _damage_levels_for_score(z_ref["score"])
+            offsets = _generate_offsets(z_ref["recommended_teams"])
 
-            tasks_created.append({
-                "id": task.id,
-                "zone_id": zone.id,
-                "priority": task.priority,
-                "status": task.status,
-                "lat": task.lat,
-                "lng": task.lng,
-                "address": task.address,
-                "building_type": task.building_type,
-                "reported_damage_level": task.reported_damage_level,
-                "notes": task.notes,
-            })
+            for i in range(z_ref["recommended_teams"]):
+                lat_off, lng_off = offsets[i] if i < len(offsets) else (0.0, 0.0)
+
+                task = Task(
+                    zone_id=z_ref["id"],
+                    priority=priority_class,
+                    status="pending_approval",
+                    lat=z_ref["lat"] + lat_off,
+                    lng=z_ref["lng"] + lng_off,
+                    address=f"{zone_name}, Bölge {i + 1}",
+                    building_type=building_types[i % len(building_types)],
+                    reported_damage_level=damage_levels[i % len(damage_levels)],
+                    notes=f"AI analiz: {z_ref['risk_factors']}" if z_ref['risk_factors'] else f"AI tarafından oluşturuldu - {zone_name}",
+                )
+                session.add(task)
+                await session.flush()
+                tasks_created.append(_format_task_dict(task))
 
     await session.commit()
 
@@ -158,6 +183,20 @@ async def generate_from_analysis(
         "tasks": tasks_created,
     }
 
+
+def _format_task_dict(task: Task) -> dict:
+    return {
+        "id": task.id,
+        "zone_id": task.zone_id,
+        "priority": task.priority,
+        "status": task.status,
+        "lat": task.lat,
+        "lng": task.lng,
+        "address": task.address,
+        "building_type": task.building_type,
+        "reported_damage_level": task.reported_damage_level,
+        "notes": task.notes,
+    }
 
 def _damage_levels_for_score(score: float) -> list[str]:
     """Return likely damage levels based on zone priority score."""
