@@ -186,20 +186,24 @@ async def inject_earthquake(eq: MockEarthquake = Body(...)):
     from services.ai_engine import analyze_with_gemini, generate_fallback_analysis
     from services.task_generator import generate_from_analysis
     from services.dispatcher import assign_pending_tasks, broadcast_assignments
+    from services.afad_client import _generate_affected_regions
+
+    affected = _generate_affected_regions(eq.lat, eq.lng, eq.magnitude, eq.city, [])
 
     mock_data = {
         "earthquake_id": f"DEMO-{int(__import__('time').time())}",
         "magnitude": eq.magnitude,
-        "depth": eq.depth,
+        "depth_km": eq.depth,
         "location": eq.city,
         "lat": eq.lat,
         "lng": eq.lng,
-        "affected_regions": [eq.city],
+        "epicenter": {"lat": eq.lat, "lng": eq.lng},
+        "affected_regions": affected,
         "date": __import__('datetime').datetime.now().isoformat(),
     }
 
     # AI Analysis (Gemini or fallback)
-    ai_result = await analyze_with_gemini(mock_data, [eq.city])
+    ai_result = await analyze_with_gemini(mock_data, affected)
     if ai_result and "zones" in ai_result:
         analysis = ai_result
         method = "gemini"

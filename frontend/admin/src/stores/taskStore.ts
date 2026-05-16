@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { db, queueForSync, type Task } from '../services/localDb';
+import { useTeamStore } from './teamStore';
 
 interface TaskState {
   tasks: Task[];
@@ -24,6 +25,7 @@ interface TaskState {
   removeTask: (taskId: number) => void;
 
   completeTask: (taskId: number, status: Task['status']) => Promise<void>;
+  autoDispatch: () => Promise<number>;
 }
 
 export const useTaskStore = create<TaskState>()(
@@ -97,6 +99,57 @@ export const useTaskStore = create<TaskState>()(
         } catch (e) {
           console.error('[TaskStore] Sync queue failed:', e);
         }
+      },
+
+      autoDispatch: async () => {
+        const teamsStore = useTeamStore.getState();
+        const teams = [...teamsStore.teams];
+        const tasks = [...get().tasks];
+        
+        let idleTeams = teams.filter(t => t.status === 'idle');
+        const unassignedTasks = tasks
+          .filter(t => t.status === 'pending')
+          .sort((a, b) => {
+            const p: Record<string, number> = { 'KRİTİK': 4, 'CRITICAL': 4, 'RED': 4, 'YÜKSEK': 3, 'HIGH': 3, 'ORTA': 2, 'DÜŞÜK': 1 };
+            return (p[b.priority] || 0) - (p[a.priority] || 0);
+          });
+
+        let assignedCount = 0;
+        const timestamp = Date.now();
+
+        for (const task of unassignedTasks) {
+          if (idleTeams.length === 0) break;
+          const team = idleTeams.shift();
+          if (team) {
+            // Update task
+            const taskIndex = tasks.findIndex(t => t.id === task.id);
+            if (taskIndex !== -1) {
+              tasks[taskIndex] = { ...tasks[taskIndex], status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp };
+              
+              // Update team
+              const teamIndex = teams.findIndex(t => t.id === team.id);
+              if (teamIndex !== -1) {
+                teams[teamIndex] = { ...teams[teamIndex], status: 'assigned' };
+              }
+              
+              // Sync task
+              await db.tasks.update(task.id, { status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp });
+              await queueForSync('tasks', 'update', { id: task.id, status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp });
+              
+              // Sync team
+              await db.teams.update(team.id, { status: 'assigned' });
+              await queueForSync('teams', 'update', { id: team.id, status: 'assigned' });
+
+              assignedCount++;
+            }
+          }
+        }
+
+        // Set state for both (UI visually updates)
+        set({ tasks });
+        teamsStore.setTeams(teams);
+
+        return assignedCount;
       },
     }),
     {

@@ -211,7 +211,7 @@ async def fetch_latest_earthquake() -> dict:
                     "depth": float(geom[2]),
                     "lat": float(geom[1]),
                     "lng": float(geom[0]),
-                    "title": "Bilinmeyen Bölge (USGS)" if any(x in prop.get("place", "Unknown") for x in [" of ", " CA", " km "]) else prop.get("place", "Unknown"),
+                    "title": prop.get("place", "Unknown"),
                     "date": __import__('datetime').datetime.fromtimestamp(prop.get("time", 0)/1000, tz=timezone.utc).isoformat(),
                     "source": "USGS",
                     "closestCities": []
@@ -229,15 +229,7 @@ async def fetch_latest_earthquake() -> dict:
                 geom = f["geometry"]["coordinates"]
                 
                 raw_region = prop.get("flynn_region", "Unknown")
-                title = "Bilinmeyen Bölge (EMSC)"
-                if "WESTERN TURKEY" in raw_region:
-                    title = "Batı Anadolu (EMSC)"
-                elif "EASTERN TURKEY" in raw_region:
-                    title = "Doğu Anadolu (EMSC)"
-                elif "CENTRAL TURKEY" in raw_region:
-                    title = "İç Anadolu (EMSC)"
-                elif not any(x in raw_region for x in [" OF ", "REGION"]):
-                    title = raw_region
+                title = raw_region
                     
                 events.append({
                     "id": prop.get("unid"),

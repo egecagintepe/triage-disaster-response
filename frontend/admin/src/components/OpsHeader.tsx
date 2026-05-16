@@ -101,45 +101,14 @@ export default function OpsHeader({ isOnline, teamCount, taskCount, logs = [] }:
     setSimLoading(false);
   };
 
-  // Phase 6: Auto-dispatch (Haversine)
-  const handleAutoDispatch = () => {
-    const teams = useTeamStore.getState().teams;
-    const tasks = useTaskStore.getState().tasks;
-    const idleTeams = teams.filter(t => t.status === "idle");
-    const unassigned = tasks.filter(t => t.status === "pending" && (t.priority === "RED" || t.priority === "CRITICAL" || t.priority === "KRİTİK" || t.priority === "HIGH" || t.priority === "YÜKSEK"));
-
-    if (idleTeams.length === 0 || unassigned.length === 0) {
+  // Phase 6: Auto-dispatch
+  const handleAutoDispatch = async () => {
+    const assigned = await useTaskStore.getState().autoDispatch();
+    if (assigned > 0) {
+      toast.success(`Yapay zeka ${assigned} ekibi görevlere atadı.`);
+    } else {
       toast.info("Atanacak boş ekip veya görev yok.");
-      return;
     }
-
-    // Haversine
-    const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLng = (lng2 - lng1) * Math.PI / 180;
-      let a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-      a = Math.max(0, Math.min(1, a)); // clamp to prevent NaN
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-
-    let assigned = 0;
-    const usedTeams = new Set<number>();
-    for (const task of unassigned) {
-      let bestTeam: typeof idleTeams[0] | null = null;
-      let bestDist = Infinity;
-      for (const team of idleTeams) {
-        if (usedTeams.has(team.id)) continue;
-        const d = haversine(team.current_lat ?? 41.0, team.current_lng ?? 28.9, task.lat, task.lng);
-        if (d < bestDist) { bestDist = d; bestTeam = team; }
-      }
-      if (bestTeam) {
-        usedTeams.add(bestTeam.id);
-        useTaskStore.getState().completeTask(task.id, "assigned");
-        assigned++;
-      }
-    }
-    toast.success(`Yapay zeka ${assigned} ekibi en yakın görevlere optimize etti.`);
   };
 
   // Phase 6: AAR Export
