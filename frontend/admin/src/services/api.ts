@@ -11,9 +11,10 @@
 const getApiBase = () => {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
   
-  // Force API to use the same IP if accessed via LAN/Network
+  // Force API to use the same host and protocol if accessed via network
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-    return `http://${hostname}:8000`;
+    const proto = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+    return `${proto}//${hostname}:8000`;
   }
 
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;

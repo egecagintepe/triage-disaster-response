@@ -299,13 +299,14 @@ async def analyze_with_gemini(
             }]
         }
 
-    if not GEMINI_API_KEY or GEMINI_API_KEY.endswith("_here"):
-        print("[AI] Missing/Invalid Gemini API key, using offline fallback.")
+    api_key = GEMINI_API_KEY or __import__('os').getenv("GEMINI_API_KEY")
+    if not api_key or api_key.endswith("_here"):
+        print("WARNING: Gemini API Key missing, falling back to math scoring")
         return offline_rule_based_triage(mag, depth)
 
     try:
         import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=api_key)
 
         model = genai.GenerativeModel(
             "gemini-2.5-flash",

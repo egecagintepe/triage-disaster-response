@@ -22,7 +22,6 @@ export const getApiBase = (): string => {
   // Priority 2: Build-time env var
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
 
-  // Priority 3: Same-origin detection for LAN deployments
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
@@ -39,7 +38,9 @@ export const getWsBase = (): string => {
 
   const base = getApiBase();
   // Proper protocol mapping: https → wss, http → ws
-  return base.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+  return typeof window !== 'undefined' && window.location.protocol === 'https:'
+    ? base.replace(/^http:/, 'wss:').replace(/^https:/, 'wss:')
+    : base.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
 };
 
 let isRefreshing = false;
