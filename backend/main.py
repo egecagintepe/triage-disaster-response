@@ -11,6 +11,7 @@ from routes.tasks import router as tasks_router
 from routes.teams import router as teams_router
 from routes.zones import router as zones_router
 from routes.auth import router as auth_router
+from routes.admin import router as admin_router
 from managers.websocket import ConnectionManager
 from services.sync_service import process_sync_changes, get_changes_since
 
@@ -51,6 +52,7 @@ app.include_router(auth_router)
 app.include_router(tasks_router)
 app.include_router(teams_router)
 app.include_router(zones_router)
+app.include_router(admin_router)
 
 
 @app.get("/health", tags=["system"])

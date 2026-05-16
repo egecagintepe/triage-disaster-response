@@ -1,4 +1,8 @@
-"""Gemini AI integration for zone prioritization and task generation."""
+"""Gemini AI integration for zone prioritization and task generation.
+
+Uses response_mime_type="application/json" for strict structured output.
+Falls back to rule-based scoring when Gemini is unavailable.
+"""
 
 import json
 from typing import Optional
@@ -90,30 +94,67 @@ def classify_priority(score: float) -> str:
         return "GREEN"
 
 
-def estimate_team_count(score: float, task_count: int) -> int:
-    """Estimate recommended team count based on priority and task volume."""
+def estimate_team_count(score: float, population: int = 0) -> int:
+    """Estimate recommended team count based on priority and population."""
     base = 1
     if score >= 4.0:
         base = 3
     elif score >= 3.0:
         base = 2
 
-    # Add more teams for high task counts
-    extra = task_count // 10
-    return base + extra
+    # Scale with population
+    if population >= 300000:
+        base += 2
+    elif population >= 100000:
+        base += 1
+
+    return base
 
 
-# --- Gemini AI Integration ---
+# --- Gemini AI Integration (Structured Output) ---
 
-async def analyze_with_gemini(earthquake_data: dict, zones_data: list[dict]) -> Optional[dict]:
-    """Use Gemini API to analyze earthquake data and generate zone priorities.
+# JSON schema for Gemini's response_schema parameter
+ZONE_ANALYSIS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "analysis_timestamp": {"type": "string"},
+        "zones": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "priority_score": {"type": "number"},
+                    "estimated_casualties": {"type": "integer"},
+                    "recommended_team_count": {"type": "integer"},
+                    "risk_factors": {"type": "string"},
+                },
+                "required": [
+                    "name",
+                    "priority_score",
+                    "estimated_casualties",
+                    "recommended_team_count",
+                    "risk_factors",
+                ],
+            },
+        },
+    },
+    "required": ["zones"],
+}
+
+
+async def analyze_with_gemini(
+    earthquake_data: dict,
+    zones_data: list[dict],
+) -> Optional[dict]:
+    """Use Gemini API with structured JSON output to analyze earthquake data.
 
     Args:
-        earthquake_data: Dict with magnitude, depth, epicenter coordinates.
+        earthquake_data: Dict with magnitude, depth, epicenter, affected_regions.
         zones_data: List of zone dicts with population, building info.
 
     Returns:
-        Dict with zone priorities and recommended tasks, or None if API fails.
+        Dict with zone priorities and recommended teams, or None if API fails.
     """
     if not GEMINI_API_KEY:
         print("[AI] No Gemini API key configured, using fallback scoring")
@@ -123,15 +164,30 @@ async def analyze_with_gemini(earthquake_data: dict, zones_data: list[dict]) -> 
         import google.generativeai as genai
 
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+
+        # Use response_mime_type for strict JSON output
+        model = genai.GenerativeModel(
+            "gemini-2.0-flash",
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=ZONE_ANALYSIS_SCHEMA,
+            ),
+        )
 
         prompt = _build_analysis_prompt(earthquake_data, zones_data)
 
         response = await model.generate_content_async(prompt)
         result_text = response.text
 
-        # Try to parse JSON from Gemini response
-        parsed = _parse_gemini_response(result_text)
+        # With response_mime_type="application/json", output is guaranteed valid JSON
+        parsed = json.loads(result_text)
+
+        # Validate structure
+        if "zones" not in parsed:
+            print("[AI] Gemini response missing 'zones' key")
+            return None
+
+        print(f"[AI] Gemini analysis complete: {len(parsed['zones'])} zones")
         return parsed
 
     except Exception as e:
@@ -141,52 +197,32 @@ async def analyze_with_gemini(earthquake_data: dict, zones_data: list[dict]) -> 
 
 def _build_analysis_prompt(earthquake_data: dict, zones_data: list[dict]) -> str:
     """Build the analysis prompt for Gemini."""
+
+    # Use affected_regions from earthquake_data if available
+    regions = earthquake_data.get("affected_regions", zones_data)
+
     return f"""Sen bir afet yönetimi uzmanısın. Aşağıdaki deprem verilerini analiz et ve her bölge için öncelik skoru belirle.
 
 DEPREM VERİLERİ:
 - Büyüklük: {earthquake_data.get('magnitude', 'N/A')}
 - Derinlik: {earthquake_data.get('depth_km', 'N/A')} km
-- Merkez Üssü: {earthquake_data.get('lat', 'N/A')}, {earthquake_data.get('lng', 'N/A')}
+- Merkez Üssü: {earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 'N/A'))}, {earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 'N/A'))}
 - Tarih: {earthquake_data.get('date', 'N/A')}
 
 BÖLGE VERİLERİ:
-{json.dumps(zones_data, ensure_ascii=False, indent=2)}
+{json.dumps(regions, ensure_ascii=False, indent=2)}
 
-Her bölge için şunları döndür:
-1. priority_score (1.0-5.0 arası, 5.0 en kritik)
-2. priority_class (RED/YELLOW/GREEN)
-3. estimated_casualties (tahmini etkilenen kişi)
-4. recommended_teams (önerilen ekip sayısı)
-5. recommended_tasks (yapılması gereken görevler listesi)
-6. risk_factors (risk faktörleri açıklaması)
+Her bölge için şunları hesapla:
+1. priority_score: 1.0-5.0 arası (5.0 en kritik). Episantra yakınlık, eski bina oranı, nüfus yoğunluğu ve zemin tipini dikkate al.
+2. estimated_casualties: tahmini etkilenen kişi sayısı
+3. recommended_team_count: önerilen arama-kurtarma ekip sayısı
+4. risk_factors: risk faktörleri açıklaması (Türkçe)
 
-JSON formatında yanıt ver:
-{{
-  "analysis_timestamp": "ISO timestamp",
-  "zones": [
-    {{
-      "zone_id": 1,
-      "zone_name": "...",
-      "priority_score": 4.5,
-      "priority_class": "RED",
-      "estimated_casualties": 150,
-      "recommended_teams": 5,
-      "risk_factors": "...",
-      "recommended_tasks": [
-        {{
-          "description": "...",
-          "priority": "RED",
-          "building_type": "residential",
-          "estimated_damage": "severe"
-        }}
-      ]
-    }}
-  ]
-}}"""
+name alanı bölge adıyla eşleşmeli."""
 
 
 def _parse_gemini_response(text: str) -> Optional[dict]:
-    """Extract JSON from Gemini response text."""
+    """Extract JSON from Gemini response text (legacy fallback)."""
     # Try direct parse
     try:
         return json.loads(text)
@@ -214,28 +250,40 @@ def _parse_gemini_response(text: str) -> Optional[dict]:
     return None
 
 
-def generate_tasks_from_analysis(zone_id: int, analysis: dict) -> list[dict]:
-    """Convert AI analysis results into task creation payloads."""
-    tasks = []
-    zone_data = None
+def generate_fallback_analysis(earthquake_data: dict) -> dict:
+    """Generate zone analysis using rule-based scoring (no API needed).
 
-    for z in analysis.get("zones", []):
-        if z.get("zone_id") == zone_id:
-            zone_data = z
-            break
+    This is the deterministic fallback used when Gemini is unavailable.
+    """
+    regions = earthquake_data.get("affected_regions", [])
 
-    if not zone_data:
-        return tasks
+    zones = []
+    for region in regions:
+        score = calculate_priority_score_fallback(
+            magnitude=earthquake_data.get("magnitude", 5.0),
+            depth_km=earthquake_data.get("depth_km", 20.0),
+            distance_km=region.get("distance_to_epicenter_km", 50.0),
+            population_density=region.get("population_density", 5000),
+            old_building_ratio=region.get("old_building_ratio", 0.3),
+        )
 
-    for rec_task in zone_data.get("recommended_tasks", []):
-        tasks.append({
-            "zone_id": zone_id,
-            "priority": zone_data.get("priority_class", "YELLOW"),
-            "lat": 0.0,  # To be filled with actual coordinates
-            "lng": 0.0,
-            "building_type": rec_task.get("building_type", "residential"),
-            "reported_damage_level": rec_task.get("estimated_damage", "moderate"),
-            "notes": rec_task.get("description", ""),
+        pop = region.get("population", 100000)
+        ratio = region.get("old_building_ratio", 0.3)
+        estimated = int(pop * ratio * 0.002 * (score / 3.0))
+
+        zones.append({
+            "name": region["name"],
+            "priority_score": score,
+            "estimated_casualties": estimated,
+            "recommended_team_count": estimate_team_count(score, pop),
+            "risk_factors": (
+                f"Episantra {region.get('distance_to_epicenter_km', '?')}km, "
+                f"eski bina oranı %{int(ratio * 100)}, "
+                f"nüfus yoğunluğu {region.get('population_density', '?')}/km²"
+            ),
         })
 
-    return tasks
+    return {
+        "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
+        "zones": zones,
+    }

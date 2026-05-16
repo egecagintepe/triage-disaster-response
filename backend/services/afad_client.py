@@ -13,93 +13,133 @@ import httpx
 from config import AFAD_API_URL
 
 
-# --- Mock Data (for offline development & demos) ---
+# --- Mock Data (realistic İzmir/Bornova severe earthquake scenario) ---
 
 MOCK_EARTHQUAKE = {
     "earthquake_id": "MOCK-2024-001",
     "magnitude": 6.8,
     "depth_km": 12.0,
+    "epicenter": {
+        "lat": 38.4192,
+        "lng": 27.1287,
+    },
     "lat": 38.4192,
     "lng": 27.1287,
     "location": "İzmir, Bornova",
     "date": "2024-01-15T04:17:00Z",
     "source": "MOCK",
+    "affected_regions": [
+        {
+            "name": "Bayraklı",
+            "lat": 38.4535,
+            "lng": 27.1597,
+            "population": 315000,
+            "building_count": 42000,
+            "old_building_ratio": 0.62,
+            "distance_to_epicenter_km": 3.1,
+            "population_density": 15000,
+            "soil_type": "soft",
+        },
+        {
+            "name": "Konak",
+            "lat": 38.4189,
+            "lng": 27.1287,
+            "population": 390000,
+            "building_count": 55000,
+            "old_building_ratio": 0.55,
+            "distance_to_epicenter_km": 1.5,
+            "population_density": 11200,
+            "soil_type": "medium",
+        },
+        {
+            "name": "Bornova Merkez",
+            "lat": 38.4622,
+            "lng": 27.2176,
+            "population": 450000,
+            "building_count": 85000,
+            "old_building_ratio": 0.45,
+            "distance_to_epicenter_km": 5.2,
+            "population_density": 12500,
+            "soil_type": "medium",
+        },
+        {
+            "name": "Karşıyaka",
+            "lat": 38.4610,
+            "lng": 27.1095,
+            "population": 340000,
+            "building_count": 48000,
+            "old_building_ratio": 0.38,
+            "distance_to_epicenter_km": 8.7,
+            "population_density": 8900,
+            "soil_type": "hard",
+        },
+        {
+            "name": "Çiğli",
+            "lat": 38.5010,
+            "lng": 27.0590,
+            "population": 210000,
+            "building_count": 32000,
+            "old_building_ratio": 0.22,
+            "distance_to_epicenter_km": 15.3,
+            "population_density": 6200,
+            "soil_type": "hard",
+        },
+    ],
 }
 
+# Legacy flat zone list (kept for backward compat with generate_seed_data)
 MOCK_ZONES = [
     {
-        "id": 1,
-        "name": "Bornova Merkez",
-        "lat": 38.4622,
-        "lng": 27.2176,
-        "population_density": 12500,
-        "old_building_ratio": 0.45,
-        "distance_km": 5.2,
-    },
-    {
-        "id": 2,
-        "name": "Bayraklı",
-        "lat": 38.4535,
-        "lng": 27.1597,
-        "population_density": 15000,
-        "old_building_ratio": 0.62,
-        "distance_km": 3.1,
-    },
-    {
-        "id": 3,
-        "name": "Karşıyaka",
-        "lat": 38.4610,
-        "lng": 27.1095,
-        "population_density": 8900,
-        "old_building_ratio": 0.38,
-        "distance_km": 8.7,
-    },
-    {
-        "id": 4,
-        "name": "Konak",
-        "lat": 38.4189,
-        "lng": 27.1287,
-        "population_density": 11200,
-        "old_building_ratio": 0.55,
-        "distance_km": 1.5,
-    },
-    {
-        "id": 5,
-        "name": "Çiğli",
-        "lat": 38.5010,
-        "lng": 27.0590,
-        "population_density": 6200,
-        "old_building_ratio": 0.22,
-        "distance_km": 15.3,
-    },
+        "id": i + 1,
+        "name": r["name"],
+        "lat": r["lat"],
+        "lng": r["lng"],
+        "population_density": r["population_density"],
+        "old_building_ratio": r["old_building_ratio"],
+        "distance_km": r["distance_to_epicenter_km"],
+    }
+    for i, r in enumerate(MOCK_EARTHQUAKE["affected_regions"])
 ]
+
+
+async def fetch_latest_earthquake() -> dict:
+    """Fetch the latest earthquake data from AFAD API.
+
+    Returns realistic mock JSON with:
+    - magnitude, depth, epicenter coordinates
+    - affected_regions with population, building density, soil metadata
+
+    Falls back to mock data if API unreachable.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"{AFAD_API_URL}/earthquakes/latest"
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+            print(f"[AFAD] Fetched earthquake data: M{data.get('magnitude')}")
+            return data
+    except Exception as e:
+        print(f"[AFAD] API unreachable ({e}), using mock data")
+        return MOCK_EARTHQUAKE
 
 
 async def fetch_earthquake_data(earthquake_id: Optional[str] = None) -> dict:
     """Fetch earthquake data from AFAD API.
 
     Falls back to mock data if API is unreachable.
-
-    Args:
-        earthquake_id: Specific earthquake ID to fetch. If None, fetches latest.
-
-    Returns:
-        Earthquake data dict with magnitude, depth, coordinates, etc.
     """
+    if earthquake_id is None:
+        return await fetch_latest_earthquake()
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            if earthquake_id:
-                url = f"{AFAD_API_URL}/earthquakes/{earthquake_id}"
-            else:
-                url = f"{AFAD_API_URL}/earthquakes/latest"
-
+            url = f"{AFAD_API_URL}/earthquakes/{earthquake_id}"
             response = await client.get(url)
             response.raise_for_status()
-
             data = response.json()
             print(f"[AFAD] Fetched earthquake data: M{data.get('magnitude')}")
             return data
-
     except Exception as e:
         print(f"[AFAD] API unreachable ({e}), using mock data")
         return MOCK_EARTHQUAKE
@@ -111,7 +151,6 @@ async def fetch_zone_data() -> list[dict]:
     In production, this would come from GIS databases or AFAD's zone API.
     For now, returns mock data representing İzmir districts.
     """
-    # TODO: Integrate with real GIS data source
     return MOCK_ZONES
 
 
@@ -161,7 +200,6 @@ def generate_seed_data() -> dict:
         damage_levels = ["minor", "moderate", "severe", "collapsed"]
 
         for i in range(task_count):
-            # Offset coordinates slightly for each task
             offset_lat = (i * 0.001) - (task_count * 0.0005)
             offset_lng = (i * 0.0008) - (task_count * 0.0004)
 

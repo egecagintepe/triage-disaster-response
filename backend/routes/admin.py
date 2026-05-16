@@ -13,13 +13,15 @@ from database import get_db
 from models.zone import Zone
 from models.task import Task
 from models.system_event import SystemEvent
-from services.afad_client import fetch_earthquake_data, fetch_zone_data, generate_seed_data
+from services.afad_client import fetch_latest_earthquake, fetch_earthquake_data, fetch_zone_data, generate_seed_data
 from services.ai_engine import (
     analyze_with_gemini,
+    generate_fallback_analysis,
     calculate_priority_score_fallback,
     classify_priority,
     estimate_team_count,
 )
+from services.task_generator import generate_from_analysis
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -38,6 +40,14 @@ class RunAIAnalysisRequest(BaseModel):
 
 class SeedDataRequest(BaseModel):
     clear_existing: bool = Field(default=True, description="Delete existing data before seeding")
+
+
+# --- Helper: get ws_manager from main module ---
+
+def _get_ws_manager():
+    """Import ws_manager lazily to avoid circular imports."""
+    from main import ws_manager
+    return ws_manager
 
 
 # --- Endpoints ---
@@ -69,79 +79,82 @@ async def fetch_afad_data(payload: FetchAFADRequest, db: AsyncSession = Depends(
 
 @router.post("/run-ai-analysis")
 async def run_ai_analysis(payload: RunAIAnalysisRequest, db: AsyncSession = Depends(get_db)):
-    """Run AI analysis on zones to generate/update priority scores.
+    """Full AI analysis orchestration:
 
-    Uses Gemini API if available, falls back to rule-based scoring.
+    1. Fetch AFAD earthquake data (mock)
+    2. Pass to Gemini AI Engine (or fallback)
+    3. Pass to Task Generator (Zone + Task creation)
+    4. Commit to DB
+    5. Broadcast new tasks via WebSocket
+
+    Returns created zones, tasks, and analysis method used.
     """
-    # Get zones to analyze
-    if payload.zone_ids:
-        stmt = select(Zone).where(Zone.id.in_(payload.zone_ids))
-    else:
-        stmt = select(Zone)
+    # --- Step 1: Fetch earthquake data ---
+    earthquake = await fetch_latest_earthquake()
+    print(f"[AI-FLOW] Earthquake: M{earthquake.get('magnitude')} at {earthquake.get('location')}")
 
-    result = await db.execute(stmt)
-    zones = result.scalars().all()
-
-    if not zones:
-        raise HTTPException(status_code=404, detail="No zones found to analyze")
-
-    # Fetch earthquake context
-    earthquake = await fetch_earthquake_data()
-    zone_data = await fetch_zone_data()
-
-    # Try Gemini first
-    zones_dict = [{"id": z.id, "name": z.name, "population_density": z.population_density or 0} for z in zones]
-    ai_result = await analyze_with_gemini(earthquake, zones_dict)
-
-    updated_zones = []
+    # --- Step 2: AI Analysis (Gemini or fallback) ---
+    affected_regions = earthquake.get("affected_regions", [])
+    ai_result = await analyze_with_gemini(earthquake, affected_regions)
 
     if ai_result and "zones" in ai_result:
-        # Use AI results
-        for ai_zone in ai_result["zones"]:
-            zone_id = ai_zone.get("zone_id")
-            for zone in zones:
-                if zone.id == zone_id:
-                    zone.priority_score = ai_zone.get("priority_score", zone.priority_score)
-                    if ai_zone.get("estimated_casualties"):
-                        zone.estimated_casualties = ai_zone["estimated_casualties"]
-                    if ai_zone.get("infrastructure_risk"):
-                        zone.infrastructure_risk = ai_zone["infrastructure_risk"]
-                    updated_zones.append({"id": zone.id, "name": zone.name, "score": zone.priority_score})
-                    break
         analysis_method = "gemini"
+        analysis = ai_result
+        print(f"[AI-FLOW] Gemini analysis: {len(analysis['zones'])} zones")
     else:
-        # Fallback: rule-based scoring
-        for zone in zones:
-            # Find matching zone data for distance
-            zone_info = next((z for z in zone_data if z["name"] == zone.name), None)
-            distance = zone_info["distance_km"] if zone_info else 50.0
-
-            score = calculate_priority_score_fallback(
-                magnitude=earthquake.get("magnitude", 5.0),
-                depth_km=earthquake.get("depth_km", 20.0),
-                distance_km=distance,
-                population_density=zone.population_density or 5000,
-                old_building_ratio=0.4,
-            )
-            zone.priority_score = score
-            updated_zones.append({"id": zone.id, "name": zone.name, "score": score})
         analysis_method = "fallback_rules"
+        analysis = generate_fallback_analysis(earthquake)
+        print(f"[AI-FLOW] Fallback analysis: {len(analysis['zones'])} zones")
 
-    await db.commit()
+    # --- Step 3: Generate Zone + Task records ---
+    result = await generate_from_analysis(db, analysis, earthquake)
 
-    # Log system event
+    # --- Step 4: Log system event ---
     event = SystemEvent(
         event_type="ai_analysis",
-        description=f"AI analiz tamamlandı ({analysis_method}): {len(updated_zones)} bölge güncellendi",
+        description=(
+            f"AI analiz tamamlandı ({analysis_method}): "
+            f"{result['zones_created']} bölge, {result['tasks_created']} görev oluşturuldu"
+        ),
     )
     db.add(event)
     await db.commit()
 
+    # --- Step 5: WebSocket broadcast ---
+    try:
+        ws = _get_ws_manager()
+
+        # Broadcast summary event
+        await ws.broadcast({
+            "type": "BROADCAST",
+            "message": (
+                f"🚨 AI ANALİZ TAMAMLANDI: M{earthquake.get('magnitude')} {earthquake.get('location')} — "
+                f"{result['zones_created']} bölge, {result['tasks_created']} görev oluşturuldu"
+            ),
+        })
+
+        # Broadcast each new task individually for real-time map updates
+        for task_data in result.get("tasks", []):
+            await ws.broadcast({
+                "type": "NEW_TASK",
+                "data": task_data,
+            })
+
+        print(f"[AI-FLOW] Broadcast {result['tasks_created']} tasks to all devices")
+    except Exception as e:
+        print(f"[AI-FLOW] WebSocket broadcast failed (non-fatal): {e}")
+
     return {
         "status": "completed",
         "analysis_method": analysis_method,
-        "zones_updated": len(updated_zones),
-        "results": updated_zones,
+        "earthquake": {
+            "magnitude": earthquake.get("magnitude"),
+            "location": earthquake.get("location"),
+            "depth_km": earthquake.get("depth_km"),
+        },
+        "zones_created": result["zones_created"],
+        "tasks_created": result["tasks_created"],
+        "zones": result["zones"],
     }
 
 
@@ -190,6 +203,16 @@ async def seed_data(payload: SeedDataRequest, db: AsyncSession = Depends(get_db)
     )
     db.add(event)
     await db.commit()
+
+    # Broadcast via WebSocket
+    try:
+        ws = _get_ws_manager()
+        await ws.broadcast({
+            "type": "BROADCAST",
+            "message": f"📊 Demo veri yüklendi: {len(created_zones)} bölge, {created_tasks} görev",
+        })
+    except Exception:
+        pass
 
     return {
         "status": "ok",
