@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { IntelligenceLog, LogType } from "../types";
 import { ChevronRight, ChevronLeft, CheckCircle2, Bot } from "lucide-react";
 import { useTaskStore } from "../stores/taskStore";
-import { updateTaskLocal } from "../services/localDb";
 
 interface Props {
   logs: IntelligenceLog[];
@@ -28,11 +27,9 @@ export default function IntelligenceLogPanel({ logs }: Props) {
   const tasks = useTaskStore((s) => s.tasks);
   const pendingAiTasks = tasks.filter((t) => t.status === "pending_approval");
 
-  const updateTask = useTaskStore((s) => s.updateTask);
-
+  const completeTask = useTaskStore((s) => s.completeTask);
   const handleApprove = async (taskId: number) => {
-    updateTask({ id: taskId, status: "pending" });
-    await updateTaskLocal(taskId, { status: "pending" });
+    await completeTask(taskId, "pending");
   };
 
   return (
