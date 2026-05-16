@@ -9,13 +9,26 @@
  */
 
 export const getApiBase = () => {
-  const ip = localStorage.getItem('triage_server_ip') || 'localhost:8000';
-  return `http://${ip}`;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  
+  // Force API to use the same IP if accessed via LAN/Network
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:8000`;
+  }
+
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  
+  const savedIp = localStorage.getItem('triage_server_ip');
+  if (savedIp) return `http://${savedIp}`;
+
+  return 'http://localhost:8000';
 };
 
 export const getWsBase = () => {
-  const ip = localStorage.getItem('triage_server_ip') || 'localhost:8000';
-  return `ws://${ip}`;
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+  
+  const base = getApiBase();
+  return base.replace(/^http/, 'ws');
 };
 
 let isRefreshing = false;

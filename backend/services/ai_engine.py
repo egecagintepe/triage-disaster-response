@@ -314,8 +314,8 @@ Yukarıdaki sismik verilere dayanarak risk analizi yap.
 
 ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK".
 
-RULE 1: You MUST generate EXACTLY ONE (1) organic Risk Zone polygon centered around the epicenter. DO NOT create multiple scattered zones.
-RULE 2: You MUST generate an ABSOLUTE MAXIMUM of 3 Tasks within this single zone. Consolidate needs.
+CRITICAL SYSTEM RULE: You MUST return EXACTLY ONE (1) zone polygon. You MUST return A MAXIMUM OF 3 TASKS. If you return 4 or more tasks, the system will crash. Focus ONLY on the absolute epicenter.
+CRITICAL: You MUST output exactly ONE object in the "zones" array. Zero exceptions.
 RULE 3: Priority MUST scale with magnitude. Do NOT output KRİTİK for anything under Mag 6.0.
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
@@ -380,7 +380,7 @@ def generate_fallback_analysis(earthquake_data: dict) -> dict:
             "name": region["name"],
             "priority_score": score,
             "estimated_casualties": estimated,
-            "recommended_team_count": estimate_team_count(score, pop),
+            "recommended_team_count": min(3, estimate_team_count(score, pop)),
             "risk_factors": (
                 f"Episantra {region.get('distance_to_epicenter_km', '?')}km, "
                 f"eski bina oranı %{int(ratio * 100)}, "

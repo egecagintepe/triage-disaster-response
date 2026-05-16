@@ -240,6 +240,8 @@ async def inject_earthquake(eq: MockEarthquake = Body(None)):
     eq_city = chosen["city"]
 
     affected = _generate_affected_regions(eq_lat, eq_lng, eq_magnitude, eq_city, [])
+    if affected:
+        affected = [affected[0]]
 
     mock_data = {
         "earthquake_id": f"DEMO-{int(__import__('time').time())}",
@@ -345,6 +347,28 @@ async def websocket_endpoint(websocket: WebSocket, device_id: str):
         await session.commit()
 
     await ws_manager.connect(websocket, device_id)
+
+    # Broadcast team presence to all admin clients (cherry-picked from proje_kopyasi)
+    try:
+        async with async_session() as s2:
+            r2 = await s2.execute(select(Team).where(Team.device_id == device_id))
+            fresh_team = r2.scalar_one_or_none()
+            if fresh_team:
+                await ws_manager.broadcast({
+                    "type": "TEAM_PRESENCE",
+                    "data": {
+                        "team_id": fresh_team.device_id,
+                        "id": fresh_team.id,
+                        "name": fresh_team.name,
+                        "device_id": fresh_team.device_id,
+                        "device_ip": fresh_team.device_ip,
+                        "status": "idle",
+                        "is_online": True,
+                    }
+                })
+    except Exception as e:
+        print(f"[WS] Presence broadcast failed: {e}")
+
     try:
         while True:
             data = await websocket.receive_json()

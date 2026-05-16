@@ -4,9 +4,11 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON, TileLayer, Marker } from "react-leaflet";
+import { MapContainer, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON, TileLayer, Marker, FeatureGroup } from "react-leaflet";
+import { EditControl } from "react-leaflet-draw";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet-draw/dist/leaflet.draw.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode, LogType } from "../types";
 import type { Task } from "../services/localDb";
 import { db } from "../services/localDb";
@@ -119,36 +121,103 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
     return () => controller.abort();
   }, []);
 
-  // Priority Toggle
+  useEffect(() => {
+    if (!map) return;
+
+    const handleDrawCreated = async (e: any) => {
+      const { layerType, layer } = e;
+      if (layerType === 'polygon') {
+        const latlngs = layer.getLatLngs()[0];
+        const coordinates = [latlngs.map((ll: any) => [ll.lng, ll.lat])];
+        coordinates[0].push([latlngs[0].lng, latlngs[0].lat]);
+
+        const geojson = { type: "Polygon", coordinates };
+        map.addLayer(layer);
+
+        try {
+          const newZone = await api.post<any>('/api/v1/zones', {
+            name: `Bölge ${Math.floor(Math.random() * 1000)}`,
+            priority_score: 3.5, 
+            geometry: geojson
+          });
+          
+          window.dispatchEvent(new CustomEvent('map_action_log', { 
+            detail: { action: "Yeni Risk Bölgesi İşaretlendi", entity: "[MANUAL_OVERRIDE]", type: LogType.SYSTEM } 
+          }));
+          
+          if (newZone && newZone.id) {
+            await db.zones.put(newZone);
+            const points = newZone.geometry?.coordinates?.[0]?.map((c: any) => [c[1], c[0]]) || [];
+            const rz: RiskZone = {
+              id: String(newZone.id),
+              type: ZoneType.MEDIUM,
+              score: 70,
+              points
+            };
+            useZoneStore.getState().setZones([...useZoneStore.getState().zones, rz]);
+          }
+
+          map.removeLayer(layer);
+        } catch (err) {
+          console.error("Bölge oluşturulamadı:", err);
+          map.removeLayer(layer); 
+        }
+        
+        setToolMode("CURSOR");
+      }
+    };
+
+    map.on(L.Draw.Event.CREATED, handleDrawCreated);
+    return () => { map.off(L.Draw.Event.CREATED, handleDrawCreated); };
+  }, [map, setToolMode]);
+
+  const handleZoneDoubleClick = async (zone: RiskZone) => {
+    if (toolMode !== "OVERRIDE") return;
+    let nextPriorityScore = 4.5;
+    let nextType = ZoneType.MEDIUM;
+    let nextScore = 90;
+    if (zone.type === ZoneType.URGENT) { nextPriorityScore = 3.0; nextType = ZoneType.MEDIUM; nextScore = 60; }
+    else if (zone.type === ZoneType.MEDIUM) { nextPriorityScore = 1.5; nextType = ZoneType.SAFE; nextScore = 30; }
+    else { nextPriorityScore = 4.5; nextType = ZoneType.URGENT; nextScore = 90; }
+
+    useZoneStore.getState().updateZone({ ...zone, type: nextType, score: nextScore });
+    try {
+      await api.patch(`/api/v1/zones/${zone.id}`, { priority_score: nextPriorityScore });
+    } catch (e) {
+      console.error("Zone priority override failed", e);
+      useZoneStore.getState().updateZone(zone);
+    }
+  };
+
   const handleZoneClick = async (zone: RiskZone) => {
-    if (toolMode === "OVERRIDE") {
-      let nextPriorityScore = 4.5;
-      let nextType = ZoneType.MEDIUM;
-      let nextScore = 90;
-      if (zone.type === ZoneType.URGENT) { nextPriorityScore = 3.0; nextType = ZoneType.MEDIUM; nextScore = 60; }
-      else if (zone.type === ZoneType.MEDIUM) { nextPriorityScore = 1.5; nextType = ZoneType.SAFE; nextScore = 30; }
-      else { nextPriorityScore = 4.5; nextType = ZoneType.URGENT; nextScore = 90; }
+    if (toolMode !== "ERASER") return;
+    const exists = useZoneStore.getState().zones.find(z => z.id === zone.id);
+    if (!exists) return; // Anti-bounce guard
 
-      // Optimistic update
-      useZoneStore.getState().updateZone({ ...zone, type: nextType, score: nextScore });
+    useZoneStore.getState().deleteZone(zone.id);
+    try {
+      await api.delete(`/api/v1/zones/${zone.id}`);
+      await db.zones.delete(zone.id);
+    } catch (e: any) {
+      if (!e.message?.includes("404")) console.error("Zone deletion failed", e);
+    }
+  };
 
-      try {
-        await api.patch(`/api/v1/zones/${zone.id}`, { priority_score: nextPriorityScore });
-      } catch (e) {
-        console.error("Zone priority override failed", e);
-        // Rollback
-        useZoneStore.getState().updateZone(zone);
-      }
-    } else if (toolMode === "ERASER") {
-      // 1. Instant optimistic UI update
-      useZoneStore.getState().deleteZone(zone.id);
-      try {
-        // 2. Network & Local persistence
-        await api.delete(`/api/v1/zones/${zone.id}`);
-        await db.zones.delete(zone.id);
-      } catch (e) {
-        console.error("Zone deletion failed", e);
-      }
+  const handleTaskDoubleClick = async (task: Task) => {
+    if (toolMode !== "OVERRIDE") return;
+    const priorities = ["DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK"];
+    const currentIdx = priorities.indexOf(task.priority || "DÜŞÜK");
+    const nextPriority = priorities[(currentIdx + 1) % priorities.length];
+
+    const { useTaskStore } = await import("../stores/taskStore");
+    useTaskStore.getState().updateTask({ id: task.id, priority: nextPriority });
+    
+    try {
+      await api.patch(`/api/v1/tasks/${task.id}`, { priority: nextPriority });
+      await db.tasks.update(task.id, { priority: nextPriority });
+    } catch (e) {
+      console.error("Task priority override failed", e);
+      useTaskStore.getState().updateTask(task);
     }
   };
 
@@ -163,7 +232,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         attributionControl={false}
         dragging={true}
         scrollWheelZoom={true}
-        doubleClickZoom={true}
+        doubleClickZoom={false}
         preferCanvas={true}
         ref={setMap}
       >
@@ -193,6 +262,28 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           </defs>
         </svg>
 
+        {/* Draw Controls */}
+        {toolMode === "PEN" && (
+          <FeatureGroup>
+            <EditControl
+              position="topright"
+              onCreated={() => {}}
+              draw={{
+                rectangle: false,
+                circle: false,
+                circlemarker: false,
+                marker: false,
+                polyline: false,
+                polygon: {
+                  allowIntersection: false,
+                  drawError: { color: "#e1e100", message: "Kesişim olamaz!" },
+                  shapeOptions: { color: "#3B82F6" }
+                }
+              }}
+            />
+          </FeatureGroup>
+        )}
+
         {/* Risk Zones — No clusters, no heatmap, clean polygons */}
         {riskZones.filter(z => z && z.points && z.points.length > 0 && z.points.every(p => p && p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]))).map((zone) => {
           let pathOptions: L.PathOptions = {
@@ -217,7 +308,8 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
               positions={zone.points} 
               pathOptions={pathOptions}
               eventHandlers={{
-                click: () => handleZoneClick(zone)
+                click: () => handleZoneClick(zone),
+                dblclick: () => handleZoneDoubleClick(zone)
               }}
             >
               <Tooltip sticky>
@@ -262,6 +354,18 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
               key={`task-${task.id}-${idx}`}
               position={[task.lat, task.lng]}
               icon={PRIORITY_ICON_MAP[prio] || PRIORITY_ICON_MAP['DÜŞÜK']}
+              eventHandlers={{
+                dblclick: () => handleTaskDoubleClick(task),
+                click: () => {
+                  if (toolMode === "ERASER") {
+                    import("../stores/taskStore").then(({ useTaskStore }) => {
+                      useTaskStore.getState().removeTask(task.id);
+                    });
+                    api.delete(`/api/v1/tasks/${task.id}`).catch(() => {});
+                    db.tasks.delete(task.id).catch(() => {});
+                  }
+                }
+              }}
             >
               <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                 <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
@@ -274,7 +378,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
                     }>{prio}</span></p>
                     <p>DURUM: <span className="text-gray-300">{STATUS_LABELS[task.status] ?? task.status}</span></p>
                     <div className="mt-1 border-t border-white/5 pt-1">
-                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">BÖLGE:</span> {kandilliEq?.location_properties?.closestCity?.name || kandilliEq?.title?.split(" ")[0] || "Bilinmeyen Koordinat"}</p>
+                      <p className="text-gray-400 text-[9px]"><span className="text-gray-500">BÖLGE:</span> {task.address || kandilliEq?.title?.split(" ")[0] || "Bilinmeyen"}</p>
                       <p className="text-gray-400 text-[9px]"><span className="text-gray-500">ŞİDDET:</span> <span className="text-amber-400">{kandilliEq?.mag || "?"} M</span></p>
                       <p className="text-gray-400 text-[9px]"><span className="text-gray-500">DERİNLİK:</span> <span className="text-blue-400">{kandilliEq?.depth || "?"} km</span></p>
                       <p className="text-gray-400 text-[9px]"><span className="text-gray-500">KIRIK UZUNLUĞU:</span> <span className="text-red-400">{kandilliEq?.rupture_length_km || "?"} km</span></p>

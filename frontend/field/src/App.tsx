@@ -7,8 +7,10 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import StatusBar from './components/StatusBar';
 import TaskMap from './components/TaskMap';
 import SwipeButton from './components/SwipeButton';
+import QrShareModal from './components/QrShareModal';
+import QrScannerModal from './components/QrScannerModal';
 import Login from './pages/Login';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Sprint 2.1 + 2.3 services
 import { useTaskStore } from './stores/taskStore';
@@ -33,6 +35,9 @@ export default function App() {
   const isOnline = useOnlineStatus();
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [emergencyAlert, setEmergencyAlert] = useState<{ message: string; severity: string } | null>(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [showQrShare, setShowQrShare] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
 
   // Active task = first pending/assigned/in_progress task for this device
   const activeTask: Task | undefined = tasks.find(
@@ -236,52 +241,91 @@ export default function App() {
               address={activeTask.address || `Konum: ${activeTask.lat.toFixed(4)}, ${activeTask.lng.toFixed(4)}`}
               priority={activeTask.priority}
               status={activeTask.status}
+              isExpanded={isMapExpanded}
+              onExpand={() => setIsMapExpanded(true)}
+              onCollapse={() => setIsMapExpanded(false)}
             />
 
-            <div className="flex-1 px-4 flex flex-col justify-center gap-6 py-6 overflow-hidden">
-              {/* Show different buttons based on task status */}
-              {(activeTask.status === 'pending' || activeTask.status === 'assigned') && (
-                <>
-                  <SwipeButton
-                    label="Bölgeye Ulaşıldı →"
-                    thumbColor="bg-emerald-600"
-                    onConfirm={handleArrived}
-                  />
-                  <SwipeButton
-                    label="Destek Ekip Lazım →"
-                    thumbColor="bg-red-600"
-                    pulse
-                    onConfirm={handleRequestBackup}
-                  />
-                  <SwipeButton
-                    label="Hasar Yok / İptal →"
-                    thumbColor="bg-gray-600"
-                    onConfirm={handleCancel}
-                  />
-                </>
-              )}
+            <AnimatePresence>
+              {!isMapExpanded && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 50, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex-1 px-4 flex flex-col justify-center gap-6 py-6 overflow-hidden"
+                >
+                  {/* Show different buttons based on task status */}
+                  {(activeTask.status === 'pending' || activeTask.status === 'assigned') && (
+                    <>
+                      <SwipeButton
+                        label="Bölgeye Ulaşıldı →"
+                        thumbColor="bg-emerald-600"
+                        onConfirm={handleArrived}
+                      />
+                      <SwipeButton
+                        label="Görev Paylaştır →"
+                        thumbColor="bg-amber-500"
+                        onConfirm={handleRequestBackup}
+                      />
+                      <SwipeButton
+                        label="Hasar Yok / İptal →"
+                        thumbColor="bg-gray-600"
+                        onConfirm={handleCancel}
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowQrShare(true)}
+                          className="flex-1 py-3 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 font-bold rounded-xl transition-colors text-sm"
+                        >
+                          📤 QR Paylaş
+                        </button>
+                        <button
+                          onClick={() => setShowQrScanner(true)}
+                          className="flex-1 py-3 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-300 font-bold rounded-xl transition-colors text-sm"
+                        >
+                          📥 QR Al
+                        </button>
+                      </div>
+                    </>
+                  )}
 
-              {activeTask.status === 'in_progress' && (
-                <>
-                  <SwipeButton
-                    label="Görev Tamamlandı →"
-                    thumbColor="bg-emerald-600"
-                    onConfirm={handleComplete}
-                  />
-                  <SwipeButton
-                    label="Destek Ekip Lazım →"
-                    thumbColor="bg-red-600"
-                    pulse
-                    onConfirm={handleRequestBackup}
-                  />
-                  <SwipeButton
-                    label="Yanlış Alarm →"
-                    thumbColor="bg-gray-600"
-                    onConfirm={handleCancel}
-                  />
-                </>
+                  {activeTask.status === 'in_progress' && (
+                    <>
+                      <SwipeButton
+                        label="Görev Tamamlandı →"
+                        thumbColor="bg-emerald-600"
+                        onConfirm={handleComplete}
+                      />
+                      <SwipeButton
+                        label="Görev Paylaştır →"
+                        thumbColor="bg-amber-500"
+                        onConfirm={handleRequestBackup}
+                      />
+                      <SwipeButton
+                        label="Yanlış Alarm →"
+                        thumbColor="bg-gray-600"
+                        onConfirm={handleCancel}
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowQrShare(true)}
+                          className="flex-1 py-3 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 font-bold rounded-xl transition-colors text-sm"
+                        >
+                          📤 QR Paylaş
+                        </button>
+                        <button
+                          onClick={() => setShowQrScanner(true)}
+                          className="flex-1 py-3 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-300 font-bold rounded-xl transition-colors text-sm"
+                        >
+                          📥 QR Al
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -308,10 +352,25 @@ export default function App() {
                   {pendingSyncCount} işlem senkronize edilmeyi bekliyor
                 </div>
               )}
+
+              <button
+                onClick={() => setShowQrScanner(true)}
+                className="mt-4 w-full py-3 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-300 font-bold rounded-xl transition-colors text-sm"
+              >
+                📥 QR ile Görev Al
+              </button>
             </motion.div>
           </div>
         )}
       </main>
+
+      {/* QR Modals */}
+      {showQrShare && tasks.length > 0 && (
+        <QrShareModal tasks={tasks} onClose={() => setShowQrShare(false)} />
+      )}
+      {showQrScanner && (
+        <QrScannerModal onClose={() => setShowQrScanner(false)} />
+      )}
     </div>
   );
 }

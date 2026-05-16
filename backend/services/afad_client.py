@@ -190,7 +190,7 @@ async def fetch_latest_earthquake() -> dict:
                 lat = float(coords[1])
                 lng = float(coords[0])
                 if in_turkey(lat, lng):
-                    title = eq.get("location_properties", {}).get("epiCenter", {}).get("name") or eq.get("title", "Bilinmeyen")
+                    title = eq.get("title", "Bilinmeyen")
                     events.append({
                         "id": eq.get("earthquake_id", f"KANDILLI-{eq.get('date_time', '')}"),
                         "mag": float(eq.get("mag", 0.0)),
@@ -205,72 +205,7 @@ async def fetch_latest_earthquake() -> dict:
     except Exception as e:
         print(f"[KANDILLI] API error: {e}")
 
-    # 2. Fetch USGS
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(
-                "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=5",
-                headers={"User-Agent": "Mozilla/5.0 (TRIAGE-V2 Earthquake Monitor)"}
-            )
-            data = res.json().get("features", [])
-            for f in data:
-                prop = f["properties"]
-                geom = f["geometry"]["coordinates"]
-                # GeoJSON spec: coordinates = [Longitude, Latitude, Depth]
-                lng = float(geom[0])
-                lat = float(geom[1])
-                depth = float(geom[2]) if len(geom) > 2 else 10.0
-                # STRICT Turkey guardrail — drop anything outside Turkey
-                if not in_turkey(lat, lng):
-                    continue
-
-                raw_place = prop.get("place", "Unknown")
-                events.append({
-                    "id": f["id"],
-                    "mag": float(prop.get("mag", 0.0)),
-                    "depth": depth,
-                    "lat": lat,
-                    "lng": lng,
-                    "title": f"{raw_place} (USGS)",
-                    "date": __import__('datetime').datetime.fromtimestamp(prop.get("time", 0)/1000, tz=timezone.utc).isoformat(),
-                    "source": "USGS",
-                    "closestCities": []
-                })
-    except Exception as e:
-        print(f"[USGS] API error: {e}")
-
-    # 3. Fetch EMSC
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(
-                "https://www.seismicportal.eu/fdsnws/event/1/query?format=json&limit=5",
-                headers={"User-Agent": "Mozilla/5.0 (TRIAGE-V2 Earthquake Monitor)"}
-            )
-            data = res.json().get("features", [])
-            for f in data:
-                prop = f["properties"]
-                geom = f["geometry"]["coordinates"]
-                # GeoJSON spec: coordinates = [Longitude, Latitude, Depth]
-                lng = float(geom[0])
-                lat = float(geom[1])
-                # STRICT Turkey guardrail — drop anything outside Turkey
-                if not in_turkey(lat, lng):
-                    continue
-
-                raw_region = prop.get("flynn_region") or prop.get("region", "Unknown")
-                events.append({
-                    "id": prop.get("unid"),
-                    "mag": float(prop.get("mag", 0.0)),
-                    "depth": float(prop.get("depth", 0.0)),
-                    "lat": lat,
-                    "lng": lng,
-                    "title": f"{raw_region} (EMSC)",
-                    "date": prop.get("time", ""),
-                    "source": "EMSC",
-                    "closestCities": []
-                })
-    except Exception as e:
-        print(f"[EMSC] API error: {e}")
+    # USGS and EMSC removed
 
     if not events:
         print("[ALL] No earthquake results, using mock")

@@ -8,7 +8,19 @@
  * via VITE_API_URL environment variable.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const getApiBase = () => {
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  
+  // Force API to use the same IP if accessed via LAN/Network
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:8000`;
+  }
+
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  return "http://localhost:8000";
+};
+
+export const API_BASE_URL = getApiBase();
 
 let isRefreshing = false;
 

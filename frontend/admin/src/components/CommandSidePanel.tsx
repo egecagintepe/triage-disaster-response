@@ -4,13 +4,15 @@
  */
 
 import { useState } from "react";
-import { Battery, Signal, Zap, MousePointer2, PenTool, Star, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight, Eraser } from "lucide-react";
+import { Battery, Signal, Zap, MousePointer2, PenTool, Star, AlertTriangle, CheckCircle, Clock, ChevronLeft, ChevronRight, Eraser, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { FieldUnit, UnitStatus, ToolMode } from "../types";
 import type { Task } from "../services/localDb";
+import { db } from "../services/localDb";
 import { useTaskStore } from "../stores/taskStore";
 import { useTeamStore } from "../stores/teamStore";
 import L from "leaflet";
+import { api } from "../services/api";
 
 const translatePriority = (p: string) => {
   if (p === "RED" || p === "CRITICAL" || p === "KRİTİK") return "KRİTİK";
@@ -65,6 +67,7 @@ interface Props {
 export default function CommandSidePanel({ units, tasks = [], map, mode, setMode, isOnline = true }: Props) {
   const [activeTab, setActiveTab] = useState<"fleet" | "tasks">("tasks");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [assigningTaskId, setAssigningTaskId] = useState<number | null>(null);
   const completeTask = useTaskStore((s) => s.completeTask);
   const storeTeams = useTeamStore((s) => s.teams);
 
@@ -89,6 +92,16 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
 
   const handleDispatch = async (taskId: number, status: Task["status"]) => {
     await completeTask(taskId, status);
+  };
+
+  const handleDeleteUnit = async (unit: FieldUnit) => {
+    useTeamStore.getState().removeTeam(Number(unit.id));
+    try {
+      await api.delete(`/api/v1/teams/${unit.id}`);
+      await db.teams.delete(Number(unit.id));
+    } catch (e: any) {
+      if (!e.message?.includes('404')) console.error("Team deletion failed", e);
+    }
   };
 
   // Task counts
@@ -250,12 +263,56 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                 </div>
                 {task.address && <p className="text-[10px] text-gray-400 mt-1.5 truncate">{task.address}</p>}
                 <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "assigned"); }}
-                    className="flex-1 text-[8px] font-bold bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded-lg py-1.5 transition-colors"
-                  >
-                    EKİP ATA
-                  </button>
+                  {assigningTaskId === task.id ? (
+                    <div className="flex-1 flex flex-col gap-1 bg-black/20 p-2 rounded border border-blue-500/30">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Ekip Seçin:</span>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setAssigningTaskId(null); }}
+                          className="text-[8px] text-gray-500 hover:text-gray-300"
+                        >
+                          İPTAL
+                        </button>
+                      </div>
+                      {storeTeams.filter(t => t.status === "idle").map(team => (
+                        <button
+                          key={team.id}
+                          onClick={async (e) => { 
+                            e.stopPropagation(); 
+                            try {
+                              await api.patch(`/api/v1/tasks/${task.id}`, { 
+                                assigned_team_id: team.id, 
+                                status: 'assigned' 
+                              });
+                              useTaskStore.getState().updateTask({ id: task.id, status: 'assigned', assigned_team_id: team.id });
+                              useTeamStore.getState().updateTeamStatus(team.id, 'busy');
+                              setAssigningTaskId(null);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="w-full text-left text-[9px] font-bold bg-blue-600/10 hover:bg-blue-600/30 text-blue-300 border border-blue-500/20 rounded px-2 py-1.5 transition-colors"
+                        >
+                          [ Atanacak: {team.name} ]
+                        </button>
+                      ))}
+                      {storeTeams.filter(t => t.status === "idle").length === 0 && (
+                        <span className="text-[8px] text-red-400">Uygun ekip yok</span>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAssigningTaskId(task.id); }}
+                      disabled={task.status === "assigned"}
+                      className={`flex-1 text-[8px] font-bold rounded-lg py-1.5 transition-colors border ${
+                        task.status === "assigned" 
+                          ? "bg-green-600/20 text-green-400 border-green-500/30 cursor-not-allowed" 
+                          : "bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border-blue-500/30"
+                      }`}
+                    >
+                      {task.status === "assigned" ? `ATANDI` : "EKİP ATA"}
+                    </button>
+                  )}
                 </div>
               </motion.li>
             ))}
@@ -286,12 +343,56 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                   <span className="text-[9px] text-gray-500">{STATUS_LABELS[task.status] ?? task.status}</span>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "assigned"); }}
-                    className="flex-1 text-[8px] font-bold bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded-lg py-1.5 transition-colors"
-                  >
-                    EKİP ATA
-                  </button>
+                  {assigningTaskId === task.id ? (
+                    <div className="flex-1 flex flex-col gap-1 bg-black/20 p-2 rounded border border-blue-500/30">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Ekip Seçin:</span>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setAssigningTaskId(null); }}
+                          className="text-[8px] text-gray-500 hover:text-gray-300"
+                        >
+                          İPTAL
+                        </button>
+                      </div>
+                      {storeTeams.filter(t => t.status === "idle" && t.name.toLowerCase() !== "admin" && t.name.toLowerCase() !== "komuta merkezi").map(team => (
+                        <button
+                          key={team.id}
+                          onClick={async (e) => { 
+                            e.stopPropagation(); 
+                            try {
+                              await api.patch(`/api/v1/tasks/${task.id}`, { 
+                                assigned_team_id: team.id, 
+                                status: 'assigned' 
+                              });
+                              useTaskStore.getState().updateTask({ id: task.id, status: 'assigned', assigned_team_id: team.id });
+                              useTeamStore.getState().updateTeamStatus(team.id, 'busy');
+                              setAssigningTaskId(null);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="w-full text-left text-[9px] font-bold bg-blue-600/10 hover:bg-blue-600/30 text-blue-300 border border-blue-500/20 rounded px-2 py-1.5 transition-colors"
+                        >
+                          [ Atanacak: {team.name} ]
+                        </button>
+                      ))}
+                      {storeTeams.filter(t => t.status === "idle" && t.name.toLowerCase() !== "admin" && t.name.toLowerCase() !== "komuta merkezi").length === 0 && (
+                        <span className="text-[8px] text-red-400">Uygun ekip yok</span>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAssigningTaskId(task.id); }}
+                      disabled={task.status === "assigned"}
+                      className={`flex-1 text-[8px] font-bold rounded-lg py-1.5 transition-colors border ${
+                        task.status === "assigned" 
+                          ? "bg-green-600/20 text-green-400 border-green-500/30 cursor-not-allowed" 
+                          : "bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border-blue-500/30"
+                      }`}
+                    >
+                      {task.status === "assigned" ? `ATANDI` : "EKİP ATA"}
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDispatch(task.id, "false_alarm"); }}
                     className="text-[8px] font-bold bg-gray-600/20 hover:bg-gray-600/40 text-gray-400 border border-gray-500/30 rounded-lg py-1.5 px-3 transition-colors"
@@ -357,6 +458,19 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
                   unit.statusType === UnitStatus.IDLE ? "bg-emerald-500" : 
                   unit.statusType === UnitStatus.BUSY ? "bg-red-500" : "bg-gray-500"
                 }`} />
+
+                {/* Delete Button */}
+                <div
+                  role="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteUnit(unit);
+                  }}
+                  className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-red-500/10 hover:bg-red-500/30 border border-red-500/20 hover:border-red-500/50 cursor-pointer"
+                  title="Ekibi Sil"
+                >
+                  <X className="h-3 w-3 text-red-400" />
+                </div>
 
                 <div className="flex justify-between items-start relative z-10">
                   <div className="flex flex-col">
@@ -425,9 +539,9 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
             initial={{ y: 400, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 400, opacity: 0 }}
-            className="absolute bottom-20 right-6 z-[1002] w-96 max-h-[60vh] glass-panel pointer-events-auto border-white/[0.04] flex flex-col"
+            className="absolute bottom-20 right-6 z-[1002] w-96 max-h-[60vh] glass-panel pointer-events-auto border-zinc-800 flex flex-col"
           >
-            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
               <h3 className="font-bold text-white tracking-tight flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-400" /> TOPLU GÖREV YÖNETİMİ
               </h3>
@@ -437,14 +551,14 @@ export default function CommandSidePanel({ units, tasks = [], map, mode, setMode
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {tasks.filter(t => t.status !== "resolved").map(t => (
-                <div key={t.id} className="bg-zinc-950 border border-white/[0.06] rounded p-3 flex justify-between items-center">
+                <div key={t.id} className="bg-zinc-950 border border-zinc-800 rounded p-3 flex justify-between items-center">
                   <div>
                     <div className="text-[10px] text-gray-400 font-mono">TASK://{t.id}</div>
                     <div className="text-xs font-bold text-white mt-1">{t.address?.substring(0, 25) || "Bilinmeyen Konum"}</div>
                   </div>
                   <select
                     className="bg-black border border-white/10 rounded text-xs p-1 px-2 font-mono outline-none focus:border-blue-500"
-                    value={t.priority}
+                    value={translatePriority(t.priority)}
                     onChange={(e) => {
                       const val = e.target.value;
                       useTaskStore.getState().updateTask({ id: t.id, priority: val });

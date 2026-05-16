@@ -253,7 +253,25 @@ class WebSocketManager {
     if (!data || !data.id) return;
     try {
       await db.zones.put(data as any);
-      // App.tsx has a db.zones hook that will automatically update the UI when this happens
+      // Direct Zustand store update for instant UI reactivity (cherry-picked from proje_kopyasi)
+      const { useZoneStore } = await import('../stores/zoneStore');
+      const store = useZoneStore.getState();
+      const zoneId = String(data.id);
+      const priorityScore = (data.priority_score as number) ?? 3.0;
+      const type = priorityScore >= 4.0 ? 'URGENT' : priorityScore >= 2.5 ? 'MEDIUM' : 'SAFE';
+      const geo = data.geometry as any;
+      const points = geo?.coordinates?.[0]?.map((c: number[]) => [c[1], c[0]]) || [];
+      
+      const existing = store.zones.findIndex(z => z.id === zoneId);
+      const riskZone = { id: zoneId, type, score: Math.round(priorityScore * 20), points } as any;
+      
+      if (existing >= 0) {
+        const updated = [...store.zones];
+        updated[existing] = riskZone;
+        store.setZones(updated);
+      } else {
+        store.setZones([...store.zones, riskZone]);
+      }
     } catch (e) {
       console.error('[WS] Failed to save zone update:', e);
     }
@@ -290,19 +308,31 @@ class WebSocketManager {
   }
 
   private handleTeamPresence(msg: Record<string, unknown>): void {
-    const teamId = msg.team_id as string;
-    const status = msg.status as string; // 'ONLINE' | 'OFFLINE'
+    const data = (msg.data ?? msg) as Record<string, unknown>;
+    const teamDeviceId = (data.team_id ?? data.device_id) as string;
+    const status = data.status as string;
+    const isOnline = status === 'ONLINE' || status === 'idle' || data.is_online === true;
     
-    // Find team and update its status
-    const teams = useTeamStore.getState().teams;
-    const team = teams.find((t) => t.device_id === teamId);
-    if (team) {
-      console.log("Team presence updated:", teamId, "to", status);
-      const isOnline = status === 'ONLINE';
-      
-      const updatedTeam = { ...team, is_online: isOnline };
-      useTeamStore.getState().updateTeam(updatedTeam);
-      db.teams.update(team.id, { is_online: isOnline }).catch(console.error);
+    const store = useTeamStore.getState();
+    const existing = store.teams.find((t) => t.device_id === teamDeviceId);
+    
+    if (existing) {
+      // Update existing team
+      store.updateTeam({ ...existing, is_online: isOnline });
+      db.teams.update(existing.id, { is_online: isOnline }).catch(console.error);
+    } else if (data.id) {
+      // New team — auto-register in store + Dexie (cherry-picked from proje_kopyasi)
+      const newTeam = {
+        id: data.id as number,
+        device_id: teamDeviceId,
+        device_ip: (data.device_ip as string) || 'unknown',
+        name: (data.name as string) || teamDeviceId,
+        status: 'idle' as const,
+        is_online: isOnline,
+      };
+      store.addTeam(newTeam);
+      db.teams.put(newTeam).catch(console.error);
+      console.log(`[WS] New team registered: ${newTeam.name} (${newTeam.device_id})`);
     }
   }
 
