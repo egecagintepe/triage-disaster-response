@@ -16,7 +16,6 @@ import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { syncQueue } from "./services/syncQueue";
 import { wsManager } from "./services/websocket";
 import { db, type Task, type Team, type Zone } from "./services/localDb";
-import { useZoneStore } from "./stores/zoneStore";
 import { api } from "./services/api";
 
 /* ------------------------------------------------------------------ */
