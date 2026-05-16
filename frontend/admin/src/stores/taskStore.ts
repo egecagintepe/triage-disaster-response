@@ -34,12 +34,12 @@ export const useTaskStore = create<TaskState>()(
       tasks: [],
       activeTask: null,
 
-      setTasks: (tasks) => set({ tasks }),
+      setTasks: (tasks) => set({ tasks: [...tasks] }),
 
-      setActiveTask: (task) => set({ activeTask: task }),
+      setActiveTask: (task) => set({ activeTask: task ? { ...task } : null }),
 
       addTask: (task) =>
-        set((state) => ({ tasks: [...state.tasks, task] })),
+        set((state) => ({ tasks: [...state.tasks, { ...task }] })),
 
       updateTask: (updatedTask) =>
         set((state) => ({
@@ -68,7 +68,7 @@ export const useTaskStore = create<TaskState>()(
       completeTask: async (taskId, status) => {
         const timestamp = Date.now();
 
-        // 1. Optimistic UI update
+        // 1. Optimistic UI update (immutable)
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === taskId ? { ...t, status, local_updated_at: timestamp } : t,
@@ -101,14 +101,18 @@ export const useTaskStore = create<TaskState>()(
         }
       },
 
+      /**
+       * Auto-dispatch: Match idle teams to unassigned critical tasks.
+       * Uses fully immutable state updates so the map reacts instantly.
+       */
       autoDispatch: async () => {
         const teamsStore = useTeamStore.getState();
-        const teams = [...teamsStore.teams];
-        const tasks = [...get().tasks];
-        
-        let idleTeams = teams.filter(t => t.status === 'idle');
-        const unassignedTasks = tasks
-          .filter(t => t.status === 'pending')
+        const currentTeams = [...teamsStore.teams.map(t => ({ ...t }))];
+        const currentTasks = [...get().tasks.map(t => ({ ...t }))];
+
+        const idleTeams = currentTeams.filter(t => t.status === 'idle');
+        const unassignedTasks = currentTasks
+          .filter(t => t.status === 'pending' || t.status === 'pending_approval')
           .sort((a, b) => {
             const p: Record<string, number> = { 'KRİTİK': 4, 'CRITICAL': 4, 'RED': 4, 'YÜKSEK': 3, 'HIGH': 3, 'ORTA': 2, 'DÜŞÜK': 1 };
             return (p[b.priority] || 0) - (p[a.priority] || 0);
@@ -116,38 +120,42 @@ export const useTaskStore = create<TaskState>()(
 
         let assignedCount = 0;
         const timestamp = Date.now();
+        let idleIdx = 0;
 
         for (const task of unassignedTasks) {
-          if (idleTeams.length === 0) break;
-          const team = idleTeams.shift();
-          if (team) {
-            // Update task
-            const taskIndex = tasks.findIndex(t => t.id === task.id);
-            if (taskIndex !== -1) {
-              tasks[taskIndex] = { ...tasks[taskIndex], status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp };
-              
-              // Update team
-              const teamIndex = teams.findIndex(t => t.id === team.id);
-              if (teamIndex !== -1) {
-                teams[teamIndex] = { ...teams[teamIndex], status: 'assigned' };
-              }
-              
-              // Sync task
-              await db.tasks.update(task.id, { status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp });
-              await queueForSync('tasks', 'update', { id: task.id, status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp });
-              
-              // Sync team
-              await db.teams.update(team.id, { status: 'assigned' });
-              await queueForSync('teams', 'update', { id: team.id, status: 'assigned' });
+          if (idleIdx >= idleTeams.length) break;
+          const team = idleTeams[idleIdx];
+          idleIdx++;
 
-              assignedCount++;
+          // Update task in our copy
+          const taskIndex = currentTasks.findIndex(t => t.id === task.id);
+          if (taskIndex !== -1) {
+            currentTasks[taskIndex] = {
+              ...currentTasks[taskIndex],
+              status: 'assigned',
+              assigned_team_id: team.id,
+              local_updated_at: timestamp,
+            };
+
+            // Update team in our copy
+            const teamIndex = currentTeams.findIndex(t => t.id === team.id);
+            if (teamIndex !== -1) {
+              currentTeams[teamIndex] = { ...currentTeams[teamIndex], status: 'assigned' };
             }
+
+            // Persist async (non-blocking for UI)
+            db.tasks.update(task.id, { status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp }).catch(console.error);
+            queueForSync('tasks', 'update', { id: task.id, status: 'assigned', assigned_team_id: team.id, local_updated_at: timestamp }).catch(console.error);
+            db.teams.update(team.id, { status: 'assigned' }).catch(console.error);
+            queueForSync('teams', 'update', { id: team.id, status: 'assigned' }).catch(console.error);
+
+            assignedCount++;
           }
         }
 
-        // Set state for both (UI visually updates)
-        set({ tasks });
-        teamsStore.setTeams(teams);
+        // Immutable set for both stores — triggers re-render
+        set({ tasks: [...currentTasks] });
+        teamsStore.setTeams([...currentTeams]);
 
         return assignedCount;
       },

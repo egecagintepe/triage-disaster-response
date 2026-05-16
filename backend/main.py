@@ -186,6 +186,7 @@ async def inject_earthquake(eq: MockEarthquake = Body(...)):
     from services.ai_engine import analyze_with_gemini, generate_fallback_analysis
     from services.task_generator import generate_from_analysis
     from services.dispatcher import assign_pending_tasks, broadcast_assignments
+    from services.seismology import calculate_rupture_length, predict_aftershocks
     from services.afad_client import _generate_affected_regions
 
     affected = _generate_affected_regions(eq.lat, eq.lng, eq.magnitude, eq.city, [])
@@ -200,6 +201,8 @@ async def inject_earthquake(eq: MockEarthquake = Body(...)):
         "epicenter": {"lat": eq.lat, "lng": eq.lng},
         "affected_regions": affected,
         "date": __import__('datetime').datetime.now().isoformat(),
+        "rupture_length_km": calculate_rupture_length(eq.magnitude),
+        "estimated_aftershocks": predict_aftershocks(time_since_mainshock_hours=1.0, magnitude=eq.magnitude)
     }
 
     # AI Analysis (Gemini or fallback)

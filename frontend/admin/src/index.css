@@ -32,13 +32,11 @@
 
 @layer base {
   body {
-    @apply bg-black text-gray-50 font-sans tracking-tight overflow-hidden antialiased;
+    @apply bg-black text-gray-100 font-sans tracking-tight overflow-hidden antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
-
-
 
 /* Custom hatching for No-Go Zones */
 .no-go-pattern {
@@ -88,7 +86,13 @@
   background: #000000 !important;
 }
 
-.custom-pulsing-dot::after {
+/* Glowing marker dot */
+.triage-marker-dot {
+  position: relative;
+  border-radius: 50%;
+}
+
+.triage-marker-dot::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -98,14 +102,18 @@
   height: 100%;
   background: inherit;
   border-radius: inherit;
-  animation: radar-ping 1.5s infinite;
-  opacity: 0.8;
+  animation: marker-pulse 1.5s ease-in-out infinite;
+  opacity: 0.6;
 }
 
-@keyframes radar-ping {
+@keyframes marker-pulse {
   0% {
     transform: translate(-50%, -50%) scale(1);
-    opacity: 0.8;
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0.2;
   }
   100% {
     transform: translate(-50%, -50%) scale(2.5);
@@ -118,43 +126,20 @@
 .leaflet-draw-toolbar,
 .leaflet-draw-section,
 .leaflet-draw-actions,
-[class*='leaflet-draw'] {
+[class*='leaflet-draw'],
+.leaflet-control-savetiles,
+[class*='savetiles'] {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-
-
-/* MarkerCluster styling — Cyber-Baroque dark */
-.marker-cluster-small {
-  background: rgba(59, 130, 246, 0.3) !important;
-}
-.marker-cluster-small div {
-  background: rgba(59, 130, 246, 0.7) !important;
-  color: white !important;
-  font-weight: bold;
-  font-size: 11px;
-}
-.marker-cluster-medium {
-  background: rgba(245, 158, 11, 0.3) !important;
-}
-.marker-cluster-medium div {
-  background: rgba(245, 158, 11, 0.7) !important;
-  color: white !important;
-  font-weight: bold;
-}
-.marker-cluster-large {
-  background: rgba(239, 68, 68, 0.3) !important;
-}
-.marker-cluster-large div {
-  background: rgba(239, 68, 68, 0.7) !important;
-  color: white !important;
-  font-weight: bold;
+/* Kill default leaflet marker blue square icon fallback */
+.leaflet-default-icon-path {
+  display: none !important;
 }
 
 /* Sonner toast overrides for Cyber-Baroque */
 [data-sonner-toaster] {
   font-family: "JetBrains Mono", monospace !important;
 }
-

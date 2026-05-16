@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { MapContainer, Marker, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON, TileLayer } from "react-leaflet";
+import { MapContainer, Tooltip, Polygon, Polyline, CircleMarker, useMapEvents, GeoJSON, TileLayer, Marker } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { FieldUnit, RiskZone, ZoneType, UnitStatus, ToolMode, LogType } from "../types";
@@ -13,7 +13,6 @@ import { db } from "../services/localDb";
 import { useZoneStore } from "../stores/zoneStore";
 import { api } from "../services/api";
 import CommandSidePanel from "./CommandSidePanel";
-import OfflineTileLayer from "./OfflineTileLayer";
 
 const translatePriority = (p: string) => {
   if (p === "RED" || p === "CRITICAL" || p === "KRİTİK") return "KRİTİK";
@@ -32,31 +31,37 @@ function MouseTracker() {
   return null;
 }
 
-const createMarkerIcon = (colorClass: string) => new L.DivIcon({
-  className: 'bg-transparent',
-  html: `<div class="w-3 h-3 ${colorClass} rounded-full border border-black shadow-lg shadow-${colorClass}"></div>`,
-  iconSize: [12, 12],
-  iconAnchor: [6, 6]
+// --- Custom Glowing CSS DivIcon Markers (NO external images) ---
+
+const createGlowingIcon = (color: string, size: number = 16) => new L.DivIcon({
+  className: '',
+  html: `<div class="triage-marker-dot" style="
+    width: ${size}px;
+    height: ${size}px;
+    background: ${color};
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.9);
+    box-shadow: 0 0 10px ${color}, 0 0 20px ${color}80;
+  "></div>`,
+  iconSize: [size, size],
+  iconAnchor: [size / 2, size / 2],
 });
 
-const createUnitIcon = (status: UnitStatus) => {
-  let colorClass = "bg-blue-500";
-  if (status === UnitStatus.BUSY) colorClass = "bg-red-500";
-  if (status === UnitStatus.OFFLINE) colorClass = "bg-gray-400";
-  return createMarkerIcon(colorClass);
+const PRIORITY_ICON_MAP: Record<string, L.DivIcon> = {
+  'KRİTİK': createGlowingIcon('#ef4444', 16),
+  'YÜKSEK': createGlowingIcon('#f97316', 14),
+  'ORTA': createGlowingIcon('#f59e0b', 12),
+  'DÜŞÜK': createGlowingIcon('#10b981', 10),
 };
 
-const createTaskIcon = (rawPriority: string, status: string) => {
-  const p = translatePriority(rawPriority);
-  let colorClass = "bg-emerald-500";
-  if (p === "KRİTİK") colorClass = "bg-red-500";
-  else if (p === "YÜKSEK") colorClass = "bg-orange-500";
-  else if (p === "ORTA") colorClass = "bg-amber-500";
-  return createMarkerIcon(colorClass);
+const createUnitIcon = (status: UnitStatus) => {
+  const color = status === UnitStatus.BUSY ? '#ef4444' : status === UnitStatus.OFFLINE ? '#6b7280' : '#3b82f6';
+  return createGlowingIcon(color, 14);
 };
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "BEKLİYOR",
+  pending_approval: "ONAY BEKLİYOR",
   assigned: "ATANDI",
   in_progress: "DEVAM EDİYOR",
   needs_backup: "DESTEK GEREKLİ",
@@ -89,7 +94,9 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
   const [faultLines, setFaultLines] = useState<any>(null);
 
   useEffect(() => {
-    fetch("https://api.orhanaydogdu.com.tr/deprem/kandilli/live")
+    const controller = new AbortController();
+    
+    fetch("https://api.orhanaydogdu.com.tr/deprem/kandilli/live", { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
         if (data.result && data.result.length > 0) {
@@ -98,19 +105,19 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           eq.rupture_length_km = Math.pow(10, 0.69 * mag - 3.22).toFixed(2);
           const K = 15 * (mag / 5.0);
           eq.estimated_aftershocks = Math.max(1, Math.floor(K / Math.pow(6.1, 1.1)));
-          eq.source = "USGS/Kandilli/EMSC (Backend Yönlendirmeli)";
+          eq.source = "AFAD/Kandilli/EMSC";
           setKandilliEq(eq);
         }
       })
-      .catch(console.error);
+      .catch(() => {});
 
-    fetch("/data/fay_hatlari.json")
+    fetch("/data/fay_hatlari.json", { signal: controller.signal })
       .then(res => res.json())
       .then(data => setFaultLines(data))
-      .catch(console.error);
-  }, []);
+      .catch(() => {});
 
-  // Removed leaflet-draw programmatic drawing listener per user request
+    return () => controller.abort();
+  }, []);
 
   // Priority Toggle
   const handleZoneClick = async (zone: RiskZone) => {
@@ -145,19 +152,6 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
     }
   };
 
-  const handleTaskClick = async (task: Task) => {
-    if (toolMode === "OVERRIDE") {
-      const nextPriority = task.priority === "RED" ? "YELLOW" : task.priority === "YELLOW" ? "GREEN" : "RED";
-      try {
-        await api.patch(`/api/v1/tasks/${task.id}`, { priority: nextPriority });
-      } catch (e) {
-        console.error("Task priority override failed", e);
-      }
-    }
-  };
-
-
-
   return (
     <div className="absolute inset-0 z-0 bg-black">
       <MapContainer
@@ -174,9 +168,14 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
         ref={setMap}
       >
         <MouseTracker />
+        
+        {/* CartoDB Dark Matter tiles with CORS bypass */}
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; CARTO'
+          subdomains="abcd"
+          crossOrigin="anonymous"
+          maxZoom={19}
         />
 
         {faultLines && (
@@ -194,9 +193,7 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           </defs>
         </svg>
 
-        {/* Draw Controls Removed */}
-        
-        {/* Risk Zones */}
+        {/* Risk Zones — No clusters, no heatmap, clean polygons */}
         {riskZones.filter(z => z && z.points && z.points.length > 0 && z.points.every(p => p && p.length === 2 && !isNaN(p[0]) && !isNaN(p[1]))).map((zone) => {
           let pathOptions: L.PathOptions = {
             color: zone.type === ZoneType.URGENT ? "#EF4444" : 
@@ -234,11 +231,11 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           );
         })}
 
-        {/* Phase 5: Scientific Epicenter CircleMarkers */}
+        {/* Scientific Epicenter CircleMarkers (outer rings) */}
         {tasks.filter(t => t && t.status !== "resolved" && !isNaN(t.lat) && !isNaN(t.lng)).map((task) => {
-          const prio = task.priority;
-          const isKritik = prio === "RED" || prio === "CRITICAL" || prio === "KRİTİK";
-          const isYuksek = prio === "HIGH" || prio === "YÜKSEK";
+          const prio = translatePriority(task.priority);
+          const isKritik = prio === "KRİTİK";
+          const isYuksek = prio === "YÜKSEK";
           const radius = isKritik ? 18 : isYuksek ? 14 : 10;
           const color = isKritik ? "#ef4444" : isYuksek ? "#f97316" : "#f59e0b";
           return (
@@ -257,27 +254,24 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
           );
         })}
 
-        {/* Marker Clusters */}
-        <>
-          {/* Task Markers — diamond-shaped, color = priority */}
-          {tasks.filter(t => t && t.status !== "resolved" && t.status !== "false_alarm" && !isNaN(t.lat) && !isNaN(t.lng)).map((task, idx) => (
+        {/* Task Markers — Glowing CSS DivIcons, NO external images */}
+        {tasks.filter(t => t && t.status !== "resolved" && t.status !== "false_alarm" && !isNaN(t.lat) && !isNaN(t.lng)).map((task, idx) => {
+          const prio = translatePriority(task.priority);
+          return (
             <Marker
               key={`task-${task.id}-${idx}`}
               position={[task.lat, task.lng]}
-              icon={createTaskIcon(task.priority, task.status)}
-              eventHandlers={{
-                click: () => handleTaskClick(task)
-              }}
+              icon={PRIORITY_ICON_MAP[prio] || PRIORITY_ICON_MAP['DÜŞÜK']}
             >
               <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                 <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md min-w-[140px]">
                   <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">TASK://{task.id}</p>
                   <div className="space-y-0.5">
                     <p>ÖNCELİK: <span className={
-                      translatePriority(task.priority) === "KRİTİK" ? "text-red-500 font-bold" :
-                      translatePriority(task.priority) === "YÜKSEK" ? "text-orange-400 font-bold" :
-                      translatePriority(task.priority) === "ORTA" ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"
-                    }>{translatePriority(task.priority)}</span></p>
+                      prio === "KRİTİK" ? "text-red-500 font-bold" :
+                      prio === "YÜKSEK" ? "text-orange-400 font-bold" :
+                      prio === "ORTA" ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"
+                    }>{prio}</span></p>
                     <p>DURUM: <span className="text-gray-300">{STATUS_LABELS[task.status] ?? task.status}</span></p>
                     <div className="mt-1 border-t border-white/5 pt-1">
                       <p className="text-gray-400 text-[9px]"><span className="text-gray-500">BÖLGE:</span> {kandilliEq?.location_properties?.closestCity?.name || kandilliEq?.title?.split(" ")[0] || "Bilinmeyen Koordinat"}</p>
@@ -291,32 +285,32 @@ export default function MapPanel({ units, riskZones, toolMode, setToolMode, task
                 </div>
               </Tooltip>
             </Marker>
-          ))}
+          );
+        })}
 
-          {/* Unit Markers + destination lines */}
-          {units.filter(u => u && u.coords && u.coords.length === 2 && !isNaN(u.coords[0]) && !isNaN(u.coords[1])).map((unit) => (
-            <div key={unit.id}>
-              {unit.destination && unit.statusType === UnitStatus.BUSY && (
-                <Polyline 
-                  positions={[unit.coords, unit.destination]} 
-                  pathOptions={{ color: "#3B82F6", weight: 1, dashArray: "10, 15", opacity: 0.4 }} 
-                />
-              )}
-              <Marker position={unit.coords} icon={createUnitIcon(unit.statusType)}>
-                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-                  <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md">
-                    <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">UNIT://{unit.ip}</p>
-                    <div className="space-y-0.5">
-                      <p>STATUS: <span className="text-gray-300">{unit.status}</span></p>
-                      <p>BATTERY: <span className={unit.battery < 20 ? "text-red-500 animate-pulse" : ""}>%{unit.battery}</span></p>
-                      <p>P_LATENCY: {unit.ping}ms</p>
-                    </div>
+        {/* Unit Markers + destination lines */}
+        {units.filter(u => u && u.coords && u.coords.length === 2 && !isNaN(u.coords[0]) && !isNaN(u.coords[1])).map((unit) => (
+          <div key={unit.id}>
+            {unit.destination && unit.statusType === UnitStatus.BUSY && (
+              <Polyline 
+                positions={[unit.coords, unit.destination]} 
+                pathOptions={{ color: "#3B82F6", weight: 1, dashArray: "10, 15", opacity: 0.4 }} 
+              />
+            )}
+            <Marker position={unit.coords} icon={createUnitIcon(unit.statusType)}>
+              <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                <div className="bg-zinc-950/95 text-gray-100 border border-white/[0.06] p-2 rounded-lg shadow-2xl font-mono text-[10px] backdrop-blur-md">
+                  <p className="text-blue-400 border-b border-white/10 pb-1 mb-1">UNIT://{unit.ip}</p>
+                  <div className="space-y-0.5">
+                    <p>STATUS: <span className="text-gray-300">{unit.status}</span></p>
+                    <p>BATTERY: <span className={unit.battery < 20 ? "text-red-500 animate-pulse" : ""}>%{unit.battery}</span></p>
+                    <p>P_LATENCY: {unit.ping}ms</p>
                   </div>
-                </Tooltip>
-              </Marker>
-            </div>
-          ))}
-        </>
+                </div>
+              </Tooltip>
+            </Marker>
+          </div>
+        ))}
       </MapContainer>
       
       {/* HUD & Panels - Siblings of MapContainer to ensure top-layer render */}

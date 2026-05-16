@@ -210,10 +210,13 @@ async def analyze_with_gemini(
     mag = earthquake_data.get('magnitude', 5.0)
     depth = earthquake_data.get('depth_km', 10.0)
     
-    # We now also pass rupture_length and aftershocks via earthquake_data from afad_client
+    # Phase 6: Rupture length formula for accurate simulation
+    rupture_length_km = math.pow(10, (0.69 * mag) - 3.22)
     impact_radius_km = calculate_impact_radius(mag, depth)
 
+    # Phase 4: Strict dumb proxy bypass for < 4.0
     if mag < 4.0:
+        print("[AI] Magnitude < 4.0 detected. Bypassing AI, assigning DÜŞÜK priority and 1 Observation Task.")
         return {
             "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
             "confidence_score": 1.0,
@@ -246,7 +249,7 @@ async def analyze_with_gemini(
                 "zone_name": earthquake_data.get('location', 'Merkez'),
                 "action_type": "Gözlem",
                 "priority": "DÜŞÜK",
-                "description": "Halkı sakinleştirme ve rutin devriye.",
+                "description": "Bölgede rutin devriye ve gözlem görevi.",
                 "required_teams": 1
             }]
         }
@@ -299,31 +302,27 @@ DEPREM VERİLERİ:
 - Büyüklük: {earthquake_data.get('magnitude', 'N/A')}
 - Derinlik: {earthquake_data.get('depth_km', 'N/A')} km
 - Merkez Üssü: {earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 'N/A'))}, {earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 'N/A'))}
-- Hesaplanmış Etki Yarıçapı (Algoritma Çıktısı): {impact_radius_km} km
-- Kırılma Uzunluğu (Wells & Coppersmith): {earthquake_data.get('rupture_length_km', 'N/A')} km
-- Tahmini Artçı Şok (Omori Yasası): {earthquake_data.get('estimated_aftershocks', 'N/A')} adet / 6 saat
+- Hesaplanmış Etki Yarıçapı: {impact_radius_km} km
+- Kırılma Uzunluğu (Rupture Length: 10^(0.69*M - 3.22)): {earthquake_data.get('rupture_length_km', 'N/A')} km
+- Tahmini Artçı Şok: {earthquake_data.get('estimated_aftershocks', 'N/A')} adet / 6 saat
 - Simüle Edilen Bina Yoğunluğu: Etki alanında yaklaşık {simulated_density} bina.
 
-BÖLGE VERİLERİ:
-{json.dumps(regions, ensure_ascii=False, indent=2)}
-
 GÖREV:
-Yukarıdaki sismik verilere ve {impact_radius_km} km etki yarıçapına (R = e^(0.8 * M) / depth) dayanarak bir risk analizi yap.
-ÖNEMLİ COĞRAFİ KURAL: 'polygon_coordinates' için asla kare veya düzgün altıgen çizmeyin! Sismik dalga yayılımını ve gerçek coğrafyayı taklit eden, merkez üssü etrafında en az 6-8 noktadan oluşan, asimetrik, eliptik veya organik çokgen koordinatları ([lat, lng] formatında) üretin.
-ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK". İngilizce kelime kullanmayın. YAPAY ZEKA ASLA 'YELLOW' veya 'GREEN' KULLANMAMALIDIR!
+Yukarıdaki sismik verilere dayanarak risk analizi yap.
 
-RULE 1: You MUST generate EXACTLY ONE (1) Risk Zone polygon. This polygon must be centered around the epicenter. DO NOT create multiple scattered zones.
-RULE 2: You MUST generate an ABSOLUTE MAXIMUM of 3 Tasks within this single zone. Consolidate needs into major operations.
-RULE 3: Priority MUST scale with magnitude. Do NOT output KRİTİK for anything under Mag 6.0, regardless of population.
+ÖNEMLİ COĞRAFİ KURAL (PHASE 6): 'polygon_coordinates' için rupture length (Kırılma Uzunluğu) formülünü kullanarak asimetrik, eliptik ve organik çokgen koordinatları ([lat, lng] formatında) üretin. Kesinlikle kare veya düzgün altıgen çizmeyin!
 
-Parse the epicenter location string. Translate and format it into a clean Turkish format (e.g., 'Anza, Kaliforniya (USGS)'). Do not use 'Bilinmeyen Bölge'.
+ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK".
+
+RULE 1: You MUST generate EXACTLY ONE (1) organic Risk Zone polygon centered around the epicenter. DO NOT create multiple scattered zones.
+RULE 2: You MUST generate an ABSOLUTE MAXIMUM of 3 Tasks within this single zone. Consolidate needs.
+RULE 3: Priority MUST scale with magnitude. Do NOT output KRİTİK for anything under Mag 6.0.
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
-1. 'zones' dizisini oluştur: Her bölge için episantr mesafesi ve etki yarıçapını kıyaslayarak risk seviyesi (risk_level), öncelik (priority_score: 1.0-5.0), tahmini kayıp (estimated_casualties) ve merkez koordinatlarını (lat, lng) belirle.
-2. 'tasks' dizisini oluştur: Bu bölgelerde yapılması gereken "arama_kurtarma", "hasar_tespit", "lojistik" gibi spesifik görevleri listele.
+1. 'zones' dizisini oluştur: Sadece 1 bölge olacak. Merkez koordinatları etrafında.
+2. 'tasks' dizisini oluştur: Maksimum 3 görev.
 3. Genel analiz için 'confidence_score' ve 'reasoning' (1-2 cümle) ekle.
 
-DÖNÜŞ FORMATI:
 Sadece JSON dön. Şemaya (ZONE_ANALYSIS_SCHEMA) tam olarak uy."""
 
 
