@@ -135,6 +135,15 @@ Ekranın üst kısmındaki durum çubuğunda bağlantı durumunuz gösterilir:
    - Sizin verileriniz daha yeniyse → kabul edilir
    - Sunucu verisi daha yeniyse → çakışma bildirilir ve sunucu verisi uygulanır
 
+### 📲 QR Kod ile P2P Görev Paylaşımı (Tamamen Çevrimdışı)
+
+Hiçbir sunucu bağlantısı olmadığında bile ekipler arası görev devri yapılabilir:
+
+1. **Görevleri Devreden Ekip**: Uygulama üzerinden "Görevleri Paylaş" butonuna basarak, üzerindeki aktif görevleri bir QR koda dönüştürür.
+2. **Görevi Devralan Ekip**: Uygulama üzerinden "QR Tara" butonuna basarak, diğer ekibin cihazındaki QR kodu okutur.
+3. Görev verileri (koordinatlar, öncelik, bina tipi vs.) anında devralan ekibin yerel veritabanına eklenir.
+4. Sunucu bağlantısı yeniden sağlandığında, bu transferler otomatik olarak sunucuya iletilir.
+
 ---
 
 ## Sorun Giderme

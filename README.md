@@ -16,10 +16,10 @@
 
 <br/>
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Gemini AI](https://img.shields.io/badge/Gemini_AI-2.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![PWA](https://img.shields.io/badge/PWA-Offline--First-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL_Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
@@ -129,7 +129,7 @@ Sistem yanıtı (~3 saniye):
 - Kandilli, AFAD, USGS ve EMSC'den çoklu kaynak deprem verisi
 - **Wells & Coppersmith (1994)** formülüyle sismik etki yarıçapı hesabı
 - **Omori Yasası** ile artçı şok frekans tahmini
-- Gemini 2.0 Flash ile risk bölgesi oluşturma ve görev üretimi
+- Gemini 2.5 Flash ile risk bölgesi oluşturma ve görev üretimi
 - İnternet yoksa anında devreye giren **Deterministic Fallback Engine**
 - Haversine algoritmasıyla **otomatik en-yakın ekip dispatch**
 
@@ -171,8 +171,8 @@ Sistem yanıtı (~3 saniye):
 │                   192.168.1.1 / localhost                       │
 │                                                                 │
 │  ┌──────────┐   ┌────────────────┐   ┌──────────────────────┐   │
-│  │  Nginx   │   │  FastAPI 0.136 │   │   Gemini AI Engine   │   │
-│  │ :80/:443 │──▶│  Uvicorn Async │──▶│   2.0 Flash          │   │
+│  │  Nginx   │   │  FastAPI 0.115 │   │   Gemini AI Engine   │   │
+│  │ :80/:443 │──▶│  Uvicorn Async │──▶│   2.5 Flash          │   │
 │  │  Reverse │   │  WebSocket     │   │   Structured JSON    │   │
 │  │  Proxy   │   │  GZip Middleware│  │ + Deterministic      │   │
 │  └──────────┘   └───────┬────────┘   │   Fallback Engine    │   │
@@ -217,8 +217,8 @@ Sistem yanıtı (~3 saniye):
 
 | Katman | Teknoloji | Versiyon | Amaç |
 |--------|-----------|----------|------|
-| **AI** | Google Gemini | 2.0 Flash | Risk analizi, rapor parse, görev üretimi |
-| **Backend** | FastAPI + Uvicorn | 0.136 | Async API, WebSocket, GZip |
+| **AI** | Google Gemini | 2.5 Flash | Risk analizi, rapor parse, görev üretimi |
+| **Backend** | FastAPI + Uvicorn | 0.115 | Async API, WebSocket, GZip |
 | **ORM** | SQLAlchemy + aiosqlite | 2.0 | Async veritabanı erişimi |
 | **Database** | SQLite WAL Mode | — | Sıfır kurulum, yüksek eşzamanlılık |
 | **Admin UI** | React + Vite | 19 / 6 | Komuta merkezi dashboard |
@@ -229,7 +229,7 @@ Sistem yanıtı (~3 saniye):
 | **Animasyon** | Framer Motion | — | OLED geçişler, mikro etkileşimler |
 | **Grafikler** | Recharts | — | Büyüklük, zaman, batarya grafikleri |
 | **Bildirim** | Sonner | — | Toast, acil durum anonsları |
-| **Stil** | TailwindCSS | 3.4 | OLED siyah, cyber-baroque tema |
+| **Stil** | TailwindCSS | 4.1 | OLED siyah, cyber-baroque tema |
 | **Deploy** | systemd + Nginx | — | Auto-restart, reverse proxy |
 | **PWA** | Workbox | — | Service worker, tile cache |
 
@@ -277,7 +277,7 @@ Kandilli/AFAD/USGS/EMSC
          │
          ▼
 ┌─────────────────────┐
-│  3. Gemini 2.0      │   → Organik risk poligonları (GeoJSON)
+│  3. Gemini 2.5      │   → Organik risk poligonları (GeoJSON)
 │     Flash           │   → Risk skoru (1.0 – 5.0)
 │     (Structured     │   → Görev tipi (SEARCH/LOGISTICS/COMMS)
 │      JSON Output)   │   → Ekip tahsisi önerileri
@@ -320,7 +320,7 @@ Kandilli/AFAD/USGS/EMSC
 ```
 Girdi:  "Bornova 3. sokak sarı bina çöktü, en az 5 yaralı var"
          │
-         ▼ Gemini 2.0 Flash
+         ▼ Gemini 2.5 Flash
          │
 Çıktı:  {
           "lat": 38.4619,
