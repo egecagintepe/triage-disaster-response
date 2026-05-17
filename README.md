@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🚨 TRIAGE — Autonomous Disaster Response Intelligence
+# TRIAGE — Autonomous Disaster Response Intelligence
 
-**AI-Powered Earthquake Triage System for Field Operations**
+**AI-Powered Earthquake Triage: System for Field Operations**
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
@@ -16,26 +16,26 @@
 
 ---
 
-## 🎯 The Problem
+## The Problem
 
-After a major earthquake, **communication infrastructure collapses within minutes**. Emergency teams lose coordination, duplicate efforts waste critical time, and lives are lost in the chaos. Traditional cloud-dependent systems become useless the moment they're needed most.
+After a major earthquake, communication infrastructure collapses within minutes. Emergency teams lose coordination, duplicate efforts waste critical time, and lives are lost in the chaos. Traditional cloud-dependent systems become useless the moment they are needed most.
 
-## 💡 The Solution
+## The Solution
 
-**TRIAGE** is an **internet-independent, AI-driven disaster response system** that operates entirely on a local area network. A single master node (Raspberry Pi or Mini-PC) runs the entire stack — backend, AI engine, and serves both the Command Center and Field Apps over WiFi.
+TRIAGE is an internet-independent, AI-driven disaster response system that operates entirely on a local area network. A single master node (such as a Raspberry Pi or Mini-PC) runs the entire stack — backend, AI engine, and serves both the Command Center and Field Apps over a local WiFi network.
 
 ---
 
-## 🏗️ Architecture
+## Architecture Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    MASTER NODE (LAN)                        │
 │                                                             │
 │  ┌──────────┐  ┌──────────────┐  ┌────────────────────┐     │
 │  │  Nginx   │  │  FastAPI +   │  │  Gemini AI Engine  │     │
-│  │  :8080   │──│  Uvicorn     │──│  (Structured JSON) │     │
-│  │  :8081   │  │  :8000       │  │  + Fallback Rules  │     │
+│  │          │──│  Uvicorn     │──│  (Structured JSON) │     │
+│  │          │  │              │  │  + Fallback Rules  │     │
 │  └──────────┘  └──────┬───────┘  └────────────────────┘     │
 │                       │ WebSocket                           │
 │              ┌────────┴────────┐                            │
@@ -56,41 +56,41 @@ After a major earthquake, **communication infrastructure collapses within minute
 
 ---
 
-## ⚡ Key Features
+## Key Features
 
-### 🤖 Autonomous AI Triage
-- **Live earthquake data** from Kandilli Observatory API (`api.orhanaydogdu.com.tr`)
-- **Gemini 2.0 Flash** analyzes epicenter, population density, soil type, and building age
-- **Structured JSON output** via `response_schema` — no regex, no parsing errors
-- **Deterministic fallback** — rule-based scoring when AI is unavailable
-- **Auto-dispatch** — tasks assigned to nearest idle team via Haversine distance
+### Autonomous AI Triage
+- **Live Earthquake Data:** Fetches from Kandilli Observatory API (`api.orhanaydogdu.com.tr`).
+- **Gemini 2.0 Flash:** Analyzes epicenter, population density, soil type, and building age.
+- **Structured JSON Output:** Uses `response_schema` to prevent parsing errors.
+- **Deterministic Fallback:** Rule-based scoring when AI is unavailable.
+- **Auto-Dispatch:** Tasks are assigned to the nearest idle team via Haversine distance.
 
-### 📡 Offline-First Architecture
-- **Dexie.js** local database on every field device
-- **SyncQueue (Outbox Pattern)** — operations queued offline, synced when online
-- **WebSocket real-time sync** with timestamp-based conflict resolution
-- **Service Worker (Workbox)** — UI loads instantly even if network drops
-- **Map tile caching** — OpenStreetMap / Carto tiles cached for 30 days
+### Offline-First Architecture
+- **Dexie.js:** Local database on every field device.
+- **SyncQueue (Outbox Pattern):** Operations are queued offline and synced when online.
+- **WebSocket Real-Time Sync:** Features timestamp-based conflict resolution.
+- **Service Worker (Workbox):** UI loads instantly even if the network drops.
+- **Map Tile Caching:** OpenStreetMap / Carto tiles are cached for 30 days.
 
-### 🗺️ Dual-Interface Design
-- **Komuta Merkezi (Admin)** — Landscape dashboard with react-leaflet map, team management, AI analysis trigger, intelligence log
-- **Saha Uygulaması (Field)** — Portrait mobile PWA with swipe-to-action buttons, GPS tracking, offline task updates
+### Dual-Interface Design
+- **Komuta Merkezi (Admin):** Landscape dashboard with react-leaflet map, team management, AI analysis trigger, and intelligence log.
+- **Saha Uygulamasi (Field):** Portrait mobile PWA with swipe-to-action buttons, GPS tracking, and offline task updates.
 
-### 🛡️ Disaster-Proof Deployment
-- **No Docker, no cloud** — bare-metal `systemd` + Nginx
-- **Single setup script** — `scripts/setup_server.sh` handles everything
-- **Auto-restart on boot** — `triage-backend.service` with `Restart=always`
-- **WiFi hotspot** — works on any portable router or phone tethering
+### Disaster-Proof Deployment
+- **No Docker, No Cloud:** Bare-metal `systemd` + Nginx.
+- **Single Setup Script:** `scripts/setup_server.sh` handles everything.
+- **Auto-Restart on Boot:** `triage-backend.service` configured with `Restart=always`.
+- **WiFi Hotspot:** Works on any portable router or phone tethering.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - **Python 3.11+** and **Node.js 18+**
 - Optional: `GEMINI_API_KEY` in `backend/.env` for live AI analysis
 
-### 1. Backend
+### 1. Backend Setup
 ```bash
 cd backend
 python -m venv venv
@@ -99,34 +99,24 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-### 2. Admin Dashboard
+### 2. Admin Dashboard Setup
 ```bash
 cd frontend/admin
 npm install
-npm run dev    # → http://localhost:5173
+npm run dev
 ```
 
-### 3. Field App
+### 3. Field App Setup
 ```bash
 cd frontend/field
 npm install
-npm run dev    # → http://localhost:5174
-```
-
-### 4. Production Deployment (Linux)
-```bash
-sudo ./scripts/setup_server.sh
-# Admin: http://<IP>:8080
-# Field: http://<IP>:8081
-# API:   http://<IP>:8000/docs
-```
+npm run dev
 
 ---
 
+## Project Structure
 
-## 📂 Project Structure
-
-```
+```text
 ebhack-26-dev-gaes/
 ├── backend/
 │   ├── main.py                 # FastAPI + WebSocket + GZip
@@ -149,13 +139,13 @@ ebhack-26-dev-gaes/
 ├── scripts/
 │   └── setup_server.sh         # Bare-metal deployment
 ├── docs/
-│   └── USER_GUIDE.md           # Türkçe kullanım kılavuzu
+│   └── USER_GUIDE.md           # Turkish user guide
 └── architecture.md             # Full system design document
 ```
 
 ---
 
-## 🏆 Tech Stack
+## Tech Stack
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
@@ -170,7 +160,7 @@ ebhack-26-dev-gaes/
 
 ---
 
-## 📊 Performance
+## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
@@ -183,9 +173,9 @@ ebhack-26-dev-gaes/
 
 ---
 
-## 👥 Team
+## Team
 
-**EBST Hackathon 2026** — Built with 🔥 under pressure.
+**EBST Hackathon 2026** — Built under pressure.
 
 ---
 
