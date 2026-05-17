@@ -12,8 +12,6 @@
 ### **Autonomous Disaster Response Intelligence**
 *AI-Powered Earthquake Triage System for Field Operations*
 
-</div>
-
 <br/>
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -23,17 +21,6 @@
 [![PWA](https://img.shields.io/badge/PWA-Offline--First-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL_Mode-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-
-<br/>
-
-> *"Deprem oldu. İnternet çöktü. Klasik sistemler durdu.*
-> ***TRIAGE çalışmaya devam etti."***
-
-<br/>
-
-**EBST Hackathon '26** · Balıkesir Üniversitesi · 42 saat · [Demo](#demo) · [Kurulum](#quick-start) · [Mimari](#architecture)
-
-<br/>
 
 </div>
 
