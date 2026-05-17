@@ -200,15 +200,6 @@ Sistem yanıtı (~3 saniye):
           │  Zustand        │     │  Offline Queue       │
           │  Framer Motion  │     │  Haptic Feedback     │
           └─────────────────┘     └──────────────────────┘
-                     │
-          ┌──────────▼──────┐
-          │  VATANDAŞ RAPOR │
-          │  Serbest metin  │
-          │  → Gemini Parse │
-          │  → Koordinat    │
-          │  → Severity     │
-          │  → Haritaya düş │
-          └─────────────────┘
 ```
 
 ---
