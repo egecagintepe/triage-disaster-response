@@ -14,7 +14,7 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico'],
         manifest: {
-          name: 'TRIAGE V2 — Komuta Merkezi',
+          name: 'TRIAGE — Komuta Merkezi',
           short_name: 'TRIAGE Komuta',
           description: 'Afet Yönetim Sistemi — Komuta Merkezi Arayüzü',
           theme_color: '#111827',
@@ -89,6 +89,7 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
+      allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

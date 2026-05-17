@@ -16,4 +16,6 @@ class Team(Base):
     last_seen = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     current_lat = Column(Float, nullable=True)
     current_lng = Column(Float, nullable=True)
+    battery_level = Column(Integer, default=100)
+    ping_ms = Column(Integer, default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

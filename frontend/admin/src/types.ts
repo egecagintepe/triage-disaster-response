@@ -45,6 +45,13 @@ export interface RiskZone {
   type: ZoneType;
   score: number;
   isHumanOverride?: boolean;
+  // Enriched zone metadata for tooltip display
+  name?: string;
+  estimated_casualties?: number;
+  building_density?: number;
+  population_density?: number;
+  infrastructure_risk?: number;
+  priority_score?: number;
 }
 
 export type ToolMode = "CURSOR" | "PEN" | "OVERRIDE" | "ERASER";

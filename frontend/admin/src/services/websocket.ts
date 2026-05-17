@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — WebSocket Client (Admin)
+ * TRIAGE — WebSocket Client (Admin)
  *
  * Native WebSocket client with automatic reconnection.
  * When the server pushes task/team updates, this service:
@@ -228,19 +228,72 @@ class WebSocketManager {
 
   private async handleTaskUpdate(data: Record<string, unknown>): Promise<void> {
     if (!data || !data.id) return;
+
+    // HOTFIX: Deep equality check — skip write if nothing actually changed
+    const existing = useTaskStore.getState().tasks.find(t => t.id === data.id);
+    if (existing) {
+      if (
+        existing.status === data.status &&
+        existing.priority === data.priority &&
+        existing.assigned_team_id === data.assigned_team_id &&
+        existing.notes === data.notes
+      ) {
+        return; // Identical — skip Dexie write to prevent storage spam
+      }
+    }
+
     try {
-      await db.tasks.update(data.id as number, data as any);
-      useTaskStore.getState().updateTask(data as any);
-    } catch (e) {
-      // Task might not exist locally yet — put it
-      await db.tasks.put(data as any);
-      useTaskStore.getState().addTask(data as any);
+      if (existing) {
+        await db.tasks.update(data.id as number, data as any);
+        useTaskStore.getState().updateTask(data as any);
+      } else {
+        await db.tasks.put(data as any);
+        useTaskStore.getState().addTask(data as any);
+      }
+    } catch (e: any) {
+      if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+        console.error('[STORAGE] QuotaExceeded — purging stale task cache');
+        await db.tasks.clear();
+        await db.syncQueue.clear();
+      }
     }
   }
 
   private async handleNewTask(data: Record<string, unknown>): Promise<void> {
     if (!data || !data.id) return;
-    await db.tasks.put(data as any);
+
+    // HOTFIX: Skip if we already have this exact task
+    const existing = useTaskStore.getState().tasks.find(t => t.id === data.id);
+    if (existing) {
+      if (
+        existing.status === data.status &&
+        existing.priority === data.priority &&
+        existing.assigned_team_id === data.assigned_team_id
+      ) {
+        return; // Identical — skip to prevent storage spam
+      }
+      // Changed — update instead of adding duplicate
+      try {
+        await db.tasks.update(data.id as number, data as any);
+        useTaskStore.getState().updateTask(data as any);
+      } catch (e: any) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+          await db.tasks.clear();
+          await db.syncQueue.clear();
+        }
+      }
+      return;
+    }
+
+    try {
+      await db.tasks.put(data as any);
+    } catch (e: any) {
+      if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+        await db.tasks.clear();
+        await db.syncQueue.clear();
+      }
+      return;
+    }
     useTaskStore.getState().addTask(data as any);
 
     // Browser notification
@@ -254,8 +307,46 @@ class WebSocketManager {
   private async handleZoneUpdate(data: Record<string, unknown>): Promise<void> {
     if (!data || !data.id) return;
     try {
-      await db.zones.put(data as any);
-      // App.tsx has a db.zones hook that will automatically update the UI when this happens
+      // HOTFIX: Deep equality check — skip Dexie write if zone unchanged
+      const existingZone = await db.zones.get(data.id as number).catch(() => null);
+      if (existingZone) {
+        const samePriority = (existingZone as any).priority_score === data.priority_score;
+        const sameGeo = JSON.stringify((existingZone as any).geometry) === JSON.stringify(data.geometry);
+        const sameName = (existingZone as any).name === data.name;
+        if (samePriority && sameGeo && sameName) {
+          return; // Identical — skip Dexie write
+        }
+      }
+
+      try {
+        await db.zones.put(data as any);
+      } catch (e: any) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+          console.error('[WS] QuotaExceeded on zone write — purging zone cache');
+          await db.zones.clear();
+        }
+        return;
+      }
+
+      // Directly update Zustand store (Dexie hooks removed)
+      const { useZoneStore } = await import('../stores/zoneStore');
+      const store = useZoneStore.getState();
+      const zoneId = String(data.id);
+      const priorityScore = (data.priority_score as number) ?? 3.0;
+      const type = priorityScore >= 4.0 ? 'URGENT' : priorityScore >= 2.5 ? 'MEDIUM' : 'SAFE';
+      const geo = data.geometry as any;
+      const points = geo?.coordinates?.[0]?.map((c: number[]) => [c[1], c[0]]) || [];
+      
+      const existing = store.zones.findIndex(z => z.id === zoneId);
+      const riskZone = { id: zoneId, type, score: Math.round(priorityScore * 20), points } as any;
+      
+      if (existing >= 0) {
+        const updated = [...store.zones];
+        updated[existing] = riskZone;
+        store.setZones(updated);
+      } else {
+        store.setZones([...store.zones, riskZone]);
+      }
     } catch (e) {
       console.error('[WS] Failed to save zone update:', e);
     }
@@ -275,19 +366,31 @@ class WebSocketManager {
   }
 
   private handleTeamPresence(msg: Record<string, unknown>): void {
-    const teamId = msg.team_id as string;
-    const status = msg.status as string; // 'ONLINE' | 'OFFLINE'
+    const data = (msg.data ?? msg) as Record<string, unknown>;
+    const teamDeviceId = (data.team_id ?? data.device_id) as string;
+    const status = data.status as string;
+    const isOnline = status === 'ONLINE' || status === 'idle' || data.is_online === true;
     
-    // Find team and update its status
-    const teams = useTeamStore.getState().teams;
-    const team = teams.find((t) => t.device_id === teamId);
-    if (team) {
-      console.log("Team presence updated:", teamId, "to", status);
-      const isOnline = status === 'ONLINE';
-      
-      const updatedTeam = { ...team, is_online: isOnline };
-      useTeamStore.getState().updateTeam(updatedTeam);
-      db.teams.update(team.id, { is_online: isOnline }).catch(console.error);
+    const store = useTeamStore.getState();
+    const existing = store.teams.find((t) => t.device_id === teamDeviceId);
+    
+    if (existing) {
+      // Update existing team
+      store.updateTeam({ ...existing, is_online: isOnline });
+      db.teams.update(existing.id, { is_online: isOnline }).catch(console.error);
+    } else if (data.id) {
+      // New team — add to store + Dexie
+      const newTeam = {
+        id: data.id as number,
+        device_id: teamDeviceId,
+        device_ip: (data.device_ip as string) || 'unknown',
+        name: (data.name as string) || teamDeviceId,
+        status: 'idle' as const,
+        is_online: isOnline,
+      };
+      store.addTeam(newTeam);
+      db.teams.put(newTeam).catch(console.error);
+      console.log(`[WS] New team registered: ${newTeam.name} (${newTeam.device_id})`);
     }
   }
 

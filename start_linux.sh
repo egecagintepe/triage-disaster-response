@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# TRIAGE V2 — Linux/macOS Auto-Start Script
+# TRIAGE — Linux/macOS Auto-Start Script
 # ============================================================================
 # Detects LAN IP, updates frontend .env files, starts all 3 services.
 #
@@ -17,7 +17,7 @@ ADMIN_DIR="$SCRIPT_DIR/frontend/admin"
 FIELD_DIR="$SCRIPT_DIR/frontend/field"
 
 echo "=================================================="
-echo "  TRIAGE V2 — Linux Auto-Start Script"
+echo "  TRIAGE — Linux Auto-Start Script"
 echo "=================================================="
 echo ""
 
@@ -32,7 +32,7 @@ LAN_IP=""
 if command -v hostname &> /dev/null; then
     for ip in $(hostname -I 2>/dev/null || true); do
         case "$ip" in
-            192.168.*|10.*|172.1[6-9].*|172.2[0-9].*|172.3[0-1].*)
+            192.168.*|10.*|172.*|169.254.*)
                 LAN_IP="$ip"
                 break
                 ;;
@@ -108,7 +108,7 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips "*" &
 BACKEND_PID=$!
 echo "[OK] Backend PID: $BACKEND_PID"
 

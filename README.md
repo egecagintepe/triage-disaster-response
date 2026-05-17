@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚨 TRIAGE V2 — Autonomous Disaster Response Intelligence
+# 🚨 TRIAGE — Autonomous Disaster Response Intelligence
 
 **AI-Powered Earthquake Triage System for Field Operations**
 
@@ -10,7 +10,7 @@
 [![PWA](https://img.shields.io/badge/PWA-Offline_First-5A0FC8?style=for-the-badge&logo=pwa)](https://web.dev/progressive-web-apps/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
 
-*When the earthquake strikes and the internet dies, TRIAGE V2 keeps operating.*
+*When the earthquake strikes and the internet dies, TRIAGE keeps operating.*
 
 </div>
 
@@ -22,7 +22,7 @@ After a major earthquake, **communication infrastructure collapses within minute
 
 ## 💡 The Solution
 
-**TRIAGE V2** is an **internet-independent, AI-driven disaster response system** that operates entirely on a local area network. A single master node (Raspberry Pi or Mini-PC) runs the entire stack — backend, AI engine, and serves both the Command Center and Field Apps over WiFi.
+**TRIAGE** is an **internet-independent, AI-driven disaster response system** that operates entirely on a local area network. A single master node (Raspberry Pi or Mini-PC) runs the entire stack — backend, AI engine, and serves both the Command Center and Field Apps over WiFi.
 
 ---
 
@@ -32,11 +32,11 @@ After a major earthquake, **communication infrastructure collapses within minute
 ┌─────────────────────────────────────────────────────────────┐
 │                    MASTER NODE (LAN)                        │
 │                                                             │
-│  ┌──────────┐  ┌──────────────┐  ┌────────────────────┐    │
-│  │  Nginx   │  │  FastAPI +   │  │  Gemini AI Engine  │    │
-│  │  :8080   │──│  Uvicorn     │──│  (Structured JSON) │    │
-│  │  :8081   │  │  :8000       │  │  + Fallback Rules  │    │
-│  └──────────┘  └──────┬───────┘  └────────────────────┘    │
+│  ┌──────────┐  ┌──────────────┐  ┌────────────────────┐     │
+│  │  Nginx   │  │  FastAPI +   │  │  Gemini AI Engine  │     │
+│  │  :8080   │──│  Uvicorn     │──│  (Structured JSON) │     │
+│  │  :8081   │  │  :8000       │  │  + Fallback Rules  │     │
+│  └──────────┘  └──────┬───────┘  └────────────────────┘     │
 │                       │ WebSocket                           │
 │              ┌────────┴────────┐                            │
 │              │   SQLite + WAL  │                            │
@@ -94,7 +94,7 @@ After a major earthquake, **communication infrastructure collapses within minute
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
@@ -123,22 +123,6 @@ sudo ./scripts/setup_server.sh
 
 ---
 
-## 🧪 Testing
-
-```bash
-cd backend
-python -m pytest tests/ -v
-```
-
-```
-tests/test_ai.py    — 4 tests (mocked Gemini, fallback, priority mapping, coord offsets)
-tests/test_api.py   — 8 tests (device auth, task CRUD, team management)
-tests/test_sync.py  — 5 tests (conflict resolution, timestamp comparison, batch sync)
-────────────────────
-17 passed ✅
-```
-
----
 
 ## 📂 Project Structure
 
@@ -209,6 +193,6 @@ ebhack-26-dev-gaes/
 
 *"İnternet yokken bile hayat kurtarır."*
 
-**TRIAGE V2** — When every second counts.
+**TRIAGE** — When every second counts.
 
 </div>

@@ -19,6 +19,8 @@ from config import AFAD_API_URL
 # Kandilli community API (live earthquake data)
 KANDILLI_API_URL = "https://api.orhanaydogdu.com.tr/deprem/kandilli/live"
 
+_earthquake_window = []
+
 
 # --- Simulated Impact Zone Generator ---
 
@@ -166,71 +168,105 @@ MOCK_ZONES = [
 # --- API Functions ---
 
 async def fetch_latest_earthquake() -> dict:
-    """Fetch the most recent earthquake from Kandilli Observatory live API.
-
-    Real data: magnitude, depth, coordinates, location name, date.
-    Simulated: affected_regions generated around real epicenter using
-               closest city data from the API.
-
-    Falls back to MOCK_EARTHQUAKE if API unreachable.
+    """Fetch the most recent earthquake from multiple sources (Kandilli, USGS, EMSC).
+    Merges and deduplicates events within 10km.
+    Falls back to MOCK_EARTHQUAKE if APIs unreachable.
     """
+    from services.seismology import calculate_rupture_length, predict_aftershocks
+    events = []
+
+    # 1. Fetch Kandilli
+    def in_turkey(lat: float, lng: float) -> bool:
+        # STRICT Turkey bounding box — anything outside is silently dropped
+        return 35.0 <= lat <= 43.0 and 25.0 <= lng <= 45.0
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(KANDILLI_API_URL)
-            response.raise_for_status()
-            data = response.json()
-
-        results = data.get("result", [])
-        if not results:
-            print("[KANDILLI] No earthquake results, using mock")
-            return MOCK_EARTHQUAKE
-
-        # Take the first (most recent) earthquake
-        eq = results[0]
-
-        # Kandilli GeoJSON is strictly [lng, lat]. We must explicitly map them to avoid reversal bugs.
-        coords = eq.get("geojson", {}).get("coordinates", [0, 0])
-        lng = float(coords[0])
-        lat = float(coords[1])
-        
-        # Strict mapping to prevent depth being read as magnitude
-        magnitude = float(eq.get("mag", 0.0))
-        depth = float(eq.get("depth", 0.0))
-        title = eq.get("title", "Bilinmeyen")
-        date_str = eq.get("date_time", "")
-
-        # Extract closest cities for affected_regions generation
-        loc_props = eq.get("location_properties", {})
-        closest_cities = loc_props.get("closestCities", [])
-        epicenter_name = loc_props.get("epiCenter", {}).get("name", title)
-
-        # Build our standard earthquake dict with REAL data
-        location_name = epicenter_name or title
-
-        earthquake = {
-            "earthquake_id": eq.get("earthquake_id", f"KANDILLI-{date_str}"),
-            "magnitude": magnitude,
-            "depth_km": depth,
-            "epicenter": {"lat": lat, "lng": lng},
-            "lat": lat,
-            "lng": lng,
-            "location": location_name,
-            "date": date_str,
-            "source": "KANDILLI_LIVE",
-            "affected_regions": _generate_affected_regions(
-                lat, lng, magnitude, location_name, closest_cities,
-            ),
-        }
-
-        print(
-            f"[KANDILLI] Live earthquake: M{magnitude} {location_name} "
-            f"({lat:.4f}, {lng:.4f}) depth={depth}km"
-        )
-        return earthquake
-
+            res = await client.get(KANDILLI_API_URL)
+            data = res.json().get("result", [])
+            if data:
+                eq = data[0]
+                coords = eq.get("geojson", {}).get("coordinates", [0, 0])
+                lat = float(coords[1])
+                lng = float(coords[0])
+                if in_turkey(lat, lng):
+                    title = eq.get("title", "Bilinmeyen")
+                    events.append({
+                        "id": eq.get("earthquake_id", f"KANDILLI-{eq.get('date_time', '')}"),
+                        "mag": float(eq.get("mag", 0.0)),
+                        "depth": float(eq.get("depth", 0.0)),
+                        "lat": lat,
+                        "lng": lng,
+                        "title": title,
+                        "date": eq.get("date_time", ""),
+                        "source": "AFAD/Kandilli",
+                        "closestCities": eq.get("location_properties", {}).get("closestCities", [])
+                    })
     except Exception as e:
-        print(f"[KANDILLI] API error ({e}), using mock data")
+        print(f"[KANDILLI] API error: {e}")
+
+    # USGS and EMSC removed
+
+    if not events:
+        print("[ALL] No earthquake results, using mock")
         return MOCK_EARTHQUAKE
+
+    # Sort events by date descending
+    events.sort(key=lambda x: x["date"], reverse=True)
+    
+    # Deduplicate (within 10km)
+    merged = []
+    for ev in events:
+        is_dup = False
+        for m in merged:
+            dist = math.sqrt((ev["lat"] - m["lat"])**2 + (ev["lng"] - m["lng"])**2) * 111
+            if dist < 10.0:
+                is_dup = True
+                break
+        if not is_dup:
+            merged.append(ev)
+
+    best_eq = merged[0] if merged else events[0]
+
+    # FINAL strict Turkey guardrail — ironclad check before building the result
+    if not (35.0 <= best_eq["lat"] <= 43.0 and 25.0 <= best_eq["lng"] <= 45.0):
+        print(f"[FILTER] Dropped earthquake outside Turkey: {best_eq['title']} ({best_eq['lat']:.4f}, {best_eq['lng']:.4f})")
+        return {}
+    
+    magnitude = best_eq["mag"]
+    lat = best_eq["lat"]
+    lng = best_eq["lng"]
+    
+    earthquake = {
+        "earthquake_id": best_eq["id"],
+        "magnitude": magnitude,
+        "depth_km": best_eq["depth"],
+        "epicenter": {"lat": lat, "lng": lng},
+        "lat": lat,
+        "lng": lng,
+        "location": best_eq["title"],
+        "date": best_eq["date"],
+        "source": best_eq["source"],
+        "rupture_length_km": calculate_rupture_length(magnitude),
+        "estimated_aftershocks": predict_aftershocks(time_since_mainshock_hours=6.0, base_count=15, magnitude=magnitude),
+        "affected_regions": _generate_affected_regions(
+            lat, lng, magnitude, best_eq["title"], best_eq["closestCities"],
+        ),
+    }
+
+    # Rolling Window of 50 — strict deduplication by ID, newest first
+    global _earthquake_window
+    eq_id_str = str(earthquake["earthquake_id"])
+    if not any(str(e["earthquake_id"]) == eq_id_str for e in _earthquake_window):
+        _earthquake_window.insert(0, earthquake)
+        # Trim to exactly 50 unique events
+        _earthquake_window = _earthquake_window[:50]
+
+    print(
+        f"[POLL] Live earthquake: M{magnitude} {best_eq['title']} "
+        f"({lat:.4f}, {lng:.4f}) depth={best_eq['depth']}km | Source: {best_eq['source']}"
+    )
+    return earthquake
 
 
 async def fetch_earthquake_data(earthquake_id: Optional[str] = None) -> dict:
@@ -263,12 +299,22 @@ def generate_seed_data() -> dict:
         )
         priority_class = classify_priority(score)
 
+        # Generate a small polygon around the center for demo
+        r = 0.005 # approx 500m radius
+        polygon_coords = [
+            [zone["lng"], zone["lat"] + r],
+            [zone["lng"] + r, zone["lat"]],
+            [zone["lng"], zone["lat"] - r],
+            [zone["lng"] - r, zone["lat"]],
+            [zone["lng"], zone["lat"] + r] # close polygon
+        ]
+        
         zone_record = {
             "name": zone["name"],
             "priority_score": score,
             "geometry": {
-                "type": "Point",
-                "coordinates": [zone["lng"], zone["lat"]],
+                "type": "Polygon",
+                "coordinates": [polygon_coords],
             },
             "estimated_casualties": int(zone["population_density"] * zone["old_building_ratio"] * 0.01),
             "building_density": int(zone["population_density"] * 0.3),

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from config import GEMINI_API_KEY
 
 
-# --- Fallback Rule-Based Scoring (works without API) ---
+# --- Advanced Weighted Mathematical Fallback Scoring ---
 
 def calculate_priority_score_fallback(
     magnitude: float,
@@ -21,78 +21,51 @@ def calculate_priority_score_fallback(
     population_density: int = 0,
     old_building_ratio: float = 0.0,
 ) -> float:
-    """Rule-based zone priority score calculation.
-
-    Fallback when Gemini API is unavailable.
-    Returns a score between 1.0 (low) and 5.0 (critical).
-    """
-    # Magnitude factor (most important)
-    if magnitude >= 7.0:
-        mag_score = 5.0
-    elif magnitude >= 6.0:
-        mag_score = 4.0
-    elif magnitude >= 5.0:
-        mag_score = 3.0
-    elif magnitude >= 4.0:
-        mag_score = 2.0
+    # 1. Seismic Energy Base (Exponential scale mapping)
+    # Earthquakes under 3.5 have minimal destructive energy.
+    if magnitude < 3.5:
+        return 1.0
+    
+    # Energy scales exponentially with magnitude
+    energy_factor = math.exp(magnitude - 4.5) 
+    
+    # 2. Depth Attenuation (Shallower = exponentially more surface damage)
+    # A 5km depth is vastly more destructive than a 30km depth
+    depth_attenuation = 20.0 / (depth_km + 5.0) 
+    
+    # 3. Distance Decay (Inverse scaling)
+    distance_factor = 50.0 / (distance_km + 10.0) 
+    
+    # 4. Vulnerability Modifiers
+    # Normalize population impact (assume 20,000+ is highly dense for a specific zone)
+    pop_factor = min(2.0, population_density / 20000.0)
+    # Old buildings act as a massive risk multiplier (0.0 to 1.0 ratio -> up to +1.5x risk)
+    bldg_factor = 1.0 + (old_building_ratio * 1.5)
+    
+    # 5. Raw Impact Calculation
+    raw_score = (energy_factor * depth_attenuation * distance_factor) * (1.0 + pop_factor) * bldg_factor
+    
+    # 6. Logarithmic Normalization to 1.0 - 5.0 scale
+    # We use log1p to elegantly squash massive raw scores into our 5-point scale
+    if raw_score <= 0:
+        final_score = 1.0
     else:
-        mag_score = 1.0
-
-    # Depth factor (shallow = more dangerous)
-    if depth_km <= 10:
-        depth_score = 5.0
-    elif depth_km <= 30:
-        depth_score = 4.0
-    elif depth_km <= 70:
-        depth_score = 3.0
-    else:
-        depth_score = 2.0
-
-    # Distance factor (closer = more dangerous)
-    if distance_km <= 10:
-        dist_score = 5.0
-    elif distance_km <= 30:
-        dist_score = 4.0
-    elif distance_km <= 50:
-        dist_score = 3.0
-    elif distance_km <= 100:
-        dist_score = 2.0
-    else:
-        dist_score = 1.0
-
-    # Population density factor
-    if population_density >= 10000:
-        pop_score = 5.0
-    elif population_density >= 5000:
-        pop_score = 4.0
-    elif population_density >= 1000:
-        pop_score = 3.0
-    else:
-        pop_score = 2.0
-
-    # Old building ratio factor
-    building_score = 1.0 + (old_building_ratio * 4.0)  # 0.0 → 1.0, 1.0 → 5.0
-
-    # Weighted average
-    score = (
-        mag_score * 0.30
-        + depth_score * 0.15
-        + dist_score * 0.25
-        + pop_score * 0.15
-        + building_score * 0.15
-    )
-
-    return round(min(max(score, 1.0), 5.0), 1)
+        # Tuning factor (0.8) adjusts how fast it reaches 5.0
+        final_score = 1.0 + (math.log1p(raw_score) * 0.8)
+        
+    return round(max(1.0, min(5.0, final_score)), 1)
 
 
 def classify_priority(score: float) -> str:
-    """Convert a priority score to RED/YELLOW/GREEN classification."""
-    if score >= 3.5:
-        return "RED"
-    elif score >= 2.5:
-        return "YELLOW"
+    """Convert a priority score to KRİTİK/YÜKSEK/ORTA/DÜŞÜK classification."""
+    if score >= 4.0:
+        return "KRİTİK"
+    elif score >= 3.0:
+        return "YÜKSEK"
+    elif score >= 2.0:
+        return "ORTA"
     else:
-        return "GREEN"
+        return "DÜŞÜK"
 
 
 def estimate_team_count(score: float, population: int = 0) -> int:
@@ -207,7 +180,50 @@ async def analyze_with_gemini(
     """
     mag = earthquake_data.get('magnitude', 5.0)
     depth = earthquake_data.get('depth_km', 10.0)
+    
+    # Phase 6: Rupture length formula for accurate simulation
+    rupture_length_km = math.pow(10, (0.69 * mag) - 3.22)
     impact_radius_km = calculate_impact_radius(mag, depth)
+
+    # Phase 4: Strict dumb proxy bypass for < 4.0
+    if mag < 4.0:
+        print("[AI] Magnitude < 4.0 detected. Bypassing AI, assigning DÜŞÜK priority and 1 Observation Task.")
+        return {
+            "analysis_timestamp": datetime.now(timezone.utc).isoformat(),
+            "confidence_score": 1.0,
+            "reasoning": "4.0 şiddeti altındaki sarsıntılar fiziksel hasar yaratmaz. Sadece gözlem amaçlıdır.",
+            "zones": [{
+                "name": earthquake_data.get('location', 'Merkez'),
+                "lat": earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)),
+                "lng": earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)),
+                "radius_m": 2000,
+                "risk_level": "DÜŞÜK",
+                "priority_score": 1.0,
+                "estimated_casualties": 0,
+                "recommended_team_count": 1,
+                "risk_factors": "Düşük büyüklük, hasar beklenmiyor.",
+                "polygon_coordinates": [[
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) - 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) - 0.01
+                ], [
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) + 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) - 0.01
+                ], [
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) + 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) + 0.01
+                ], [
+                    earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 0.0)) - 0.01,
+                    earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 0.0)) + 0.01
+                ]]
+            }],
+            "tasks": [{
+                "zone_name": earthquake_data.get('location', 'Merkez'),
+                "action_type": "Gözlem",
+                "priority": "DÜŞÜK",
+                "description": "Bölgede rutin devriye ve gözlem görevi.",
+                "required_teams": 1
+            }]
+        }
 
     if not GEMINI_API_KEY or GEMINI_API_KEY.endswith("_here"):
         print("[AI] Missing/Invalid Gemini API key, using offline fallback.")
@@ -257,23 +273,27 @@ DEPREM VERİLERİ:
 - Büyüklük: {earthquake_data.get('magnitude', 'N/A')}
 - Derinlik: {earthquake_data.get('depth_km', 'N/A')} km
 - Merkez Üssü: {earthquake_data.get('epicenter', {}).get('lat', earthquake_data.get('lat', 'N/A'))}, {earthquake_data.get('epicenter', {}).get('lng', earthquake_data.get('lng', 'N/A'))}
-- Hesaplanmış Etki Yarıçapı (Algoritma Çıktısı): {impact_radius_km} km
+- Hesaplanmış Etki Yarıçapı: {impact_radius_km} km
+- Kırılma Uzunluğu (Rupture Length: 10^(0.69*M - 3.22)): {earthquake_data.get('rupture_length_km', 'N/A')} km
+- Tahmini Artçı Şok: {earthquake_data.get('estimated_aftershocks', 'N/A')} adet / 6 saat
 - Simüle Edilen Bina Yoğunluğu: Etki alanında yaklaşık {simulated_density} bina.
 
-BÖLGE VERİLERİ:
-{json.dumps(regions, ensure_ascii=False, indent=2)}
-
 GÖREV:
-Yukarıdaki sismik verilere ve {impact_radius_km} km etki yarıçapına (R = e^(0.8 * M) / depth) dayanarak bir risk analizi yap.
-ÖNEMLİ COĞRAFİ KURAL: 'polygon_coordinates' için asla kare veya düzgün altıgen çizmeyin! Sismik dalga yayılımını ve gerçek coğrafyayı taklit eden, merkez üssü etrafında en az 6-8 noktadan oluşan, asimetrik, eliptik veya organik çokgen koordinatları ([lat, lng] formatında) üretin.
-ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK". İngilizce kelime kullanmayın.
+Yukarıdaki sismik verilere dayanarak risk analizi yap.
+
+ÖNEMLİ COĞRAFİ KURAL (PHASE 6): 'polygon_coordinates' için rupture length (Kırılma Uzunluğu) formülünü kullanarak asimetrik, eliptik ve organik çokgen koordinatları ([lat, lng] formatında) üretin. Kesinlikle kare veya düzgün altıgen çizmeyin!
+
+ÖNEMLİ ÖNCELİK KURALI: `risk_level` ve `priority` alanları SADECE şu değerlerden biri olmalıdır: "DÜŞÜK", "ORTA", "YÜKSEK", "KRİTİK".
+
+CRITICAL SYSTEM RULE: You MUST return EXACTLY ONE (1) zone polygon. You MUST return A MAXIMUM OF 3 TASKS. If you return 4 or more tasks, the system will crash. Focus ONLY on the absolute epicenter.
+CRITICAL: The JSON 'zones' array MUST contain EXACTLY ONE (1) object. The 'tasks' array can contain up to 3 objects. Do not generate multiple zones.
+RULE 3: Priority MUST scale with magnitude. Do NOT output KRİTİK for anything under Mag 6.0.
 
 Lütfen aşağıdaki JSON formatında kesin bir çıktı ver:
-1. 'zones' dizisini oluştur: Her bölge için episantr mesafesi ve etki yarıçapını kıyaslayarak risk seviyesi (risk_level), öncelik (priority_score: 1.0-5.0), tahmini kayıp (estimated_casualties) ve merkez koordinatlarını (lat, lng) belirle.
-2. 'tasks' dizisini oluştur: Bu bölgelerde yapılması gereken "arama_kurtarma", "hasar_tespit", "lojistik" gibi spesifik görevleri listele.
+1. 'zones' dizisini oluştur: Sadece 1 bölge olacak. Merkez koordinatları etrafında.
+2. 'tasks' dizisini oluştur: Maksimum 3 görev.
 3. Genel analiz için 'confidence_score' ve 'reasoning' (1-2 cümle) ekle.
 
-DÖNÜŞ FORMATI:
 Sadece JSON dön. Şemaya (ZONE_ANALYSIS_SCHEMA) tam olarak uy."""
 
 
@@ -331,7 +351,7 @@ def generate_fallback_analysis(earthquake_data: dict) -> dict:
             "name": region["name"],
             "priority_score": score,
             "estimated_casualties": estimated,
-            "recommended_team_count": estimate_team_count(score, pop),
+            "recommended_team_count": min(3, estimate_team_count(score, pop)),
             "risk_factors": (
                 f"Episantra {region.get('distance_to_epicenter_km', '?')}km, "
                 f"eski bina oranı %{int(ratio * 100)}, "
@@ -353,27 +373,27 @@ def offline_rule_based_triage(magnitude: float, depth: float) -> dict:
     Returns basic task generation parameters based on magnitude/depth only.
     """
     if magnitude >= 7.0:
-        priority = "RED"
+        priority = "KRİTİK"
         team_count = 5
         task_types = ["arama_kurtarma", "saglik", "lojistik", "hasar_tespit", "tahliye"]
         confidence = 0.4
     elif magnitude >= 6.0:
-        priority = "RED"
+        priority = "YÜKSEK"
         team_count = 3
         task_types = ["arama_kurtarma", "hasar_tespit", "saglik"]
         confidence = 0.5
     elif magnitude >= 5.0:
-        priority = "YELLOW"
+        priority = "ORTA"
         team_count = 2
         task_types = ["hasar_tespit", "saglik"]
         confidence = 0.6
     elif magnitude >= 4.0:
-        priority = "YELLOW"
+        priority = "DÜŞÜK"
         team_count = 1
         task_types = ["hasar_tespit"]
         confidence = 0.7
     else:
-        priority = "GREEN"
+        priority = "DÜŞÜK"
         team_count = 1
         task_types = ["izleme"]
         confidence = 0.85

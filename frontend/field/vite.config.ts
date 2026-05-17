@@ -14,7 +14,7 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico'],
         manifest: {
-          name: 'TRIAGE V2 — Saha Uygulaması',
+          name: 'TRIAGE — Saha Uygulaması',
           short_name: 'TRIAGE Saha',
           description: 'Afet Yönetim Sistemi — Saha Ekibi Mobil Arayüzü',
           theme_color: '#111827',
@@ -88,6 +88,7 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
+      allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

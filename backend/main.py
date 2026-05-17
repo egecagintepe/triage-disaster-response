@@ -1,4 +1,4 @@
-"""TRIAGE V2 – FastAPI entry point."""
+"""TRIAGE – FastAPI entry point."""
 
 import json
 import asyncio
@@ -81,11 +81,11 @@ async def _autonomous_triage_loop():
                     except Exception as e:
                         print(f"[AI-LOOP] Broadcast error (non-fatal): {e}")
 
-                    # Step 4: Auto-assign tasks
-                    assignments = await assign_pending_tasks(session)
-                    if assignments:
-                        await broadcast_assignments(assignments)
-                        print(f"[AI-LOOP] Auto-assigned {len(assignments)} tasks")
+                    # NOTE: Auto-dispatch removed. Admin must explicitly trigger OTO-ATA.
+                    # assignments = await assign_pending_tasks(session)
+                    # if assignments:
+                    #     await broadcast_assignments(assignments)
+                    #     print(f"[AI-LOOP] Auto-assigned {len(assignments)} tasks")
             else:
                 pass  # Same earthquake, skip
 
@@ -113,7 +113,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="TRIAGE V2 API",
+    title="TRIAGE API",
     description="Offline-First Afet Yönetim Sistemi – Backend API",
     version="0.1.0",
     lifespan=lifespan,
@@ -161,6 +161,9 @@ app.include_router(admin_router)
 from routes.emergency import router as emergency_router
 app.include_router(emergency_router)
 
+from routes.debug import router as debug_router
+app.include_router(debug_router, prefix="/api/v1/debug", tags=["Debug"])
+
 
 @app.get("/health", tags=["system"])
 async def health_check():
@@ -192,6 +195,27 @@ async def websocket_endpoint(websocket: WebSocket, device_id: str):
         await session.commit()
 
     await ws_manager.connect(websocket, device_id)
+
+    # Broadcast new/updated team presence to all admin clients
+    try:
+        async with async_session() as s2:
+            r2 = await s2.execute(select(Team).where(Team.device_id == device_id))
+            fresh_team = r2.scalar_one_or_none()
+            if fresh_team:
+                await ws_manager.broadcast({
+                    "type": "TEAM_PRESENCE",
+                    "data": {
+                        "team_id": fresh_team.device_id,
+                        "id": fresh_team.id,
+                        "name": fresh_team.name,
+                        "device_id": fresh_team.device_id,
+                        "device_ip": fresh_team.device_ip,
+                        "status": "idle",
+                        "is_online": True,
+                    }
+                })
+    except Exception as e:
+        print(f"[WS] Presence broadcast failed: {e}")
     try:
         while True:
             data = await websocket.receive_json()
@@ -325,9 +349,7 @@ async def handle_task_status_update(device_id: str, data: dict):
                 if release_info:
                     await broadcast_team_release(release_info)
 
-                assignments = await assign_pending_tasks(session)
-                if assignments:
-                    await broadcast_assignments(assignments)
+                # NOTE: Auto-dispatch removed. Admin must explicitly trigger OTO-ATA.
 
         elif new_status == "needs_backup":
             async with async_session() as session:

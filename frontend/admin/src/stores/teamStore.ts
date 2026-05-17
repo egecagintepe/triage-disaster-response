@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Team Store (Admin)
+ * TRIAGE — Team Store (Admin)
  *
  * Zustand store with persist middleware for team/device state management.
  * The admin dashboard needs real-time visibility into all field teams.
@@ -74,18 +74,31 @@ export const useTeamStore = create<TeamState>()(
 
       /**
        * Update team GPS coordinates (typically from WebSocket location updates).
+       * HOTFIX: Throttle Dexie writes to max once per 10s per team to prevent QuotaExceededError.
        */
       setTeamLocation: async (teamId, lat, lng) => {
+        // Always update Zustand (in-memory, instant UI)
         set((state) => ({
           teams: state.teams.map((t) =>
             t.id === teamId ? { ...t, current_lat: lat, current_lng: lng } : t,
           ),
         }));
 
+        // Throttle Dexie persist — max once per 10s per team
+        const now = Date.now();
+        const key = `_loc_persist_${teamId}`;
+        const last = (window as any)[key] ?? 0;
+        if (now - last < 10_000) return; // Skip — too soon
+        (window as any)[key] = now;
+
         try {
           await db.teams.update(teamId, { current_lat: lat, current_lng: lng });
-        } catch (e) {
-          console.error('[TeamStore] Dexie location persist failed:', e);
+        } catch (e: any) {
+          if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+            console.error('[TeamStore] QuotaExceeded — skipping location persist');
+          } else {
+            console.error('[TeamStore] Dexie location persist failed:', e);
+          }
         }
       },
     }),

@@ -104,7 +104,7 @@ DEMO_TEAMS = [
 
 async def run():
     print("=" * 60)
-    print("  TRIAGE V2 — Demo Scenario Generator")
+    print("  TRIAGE — Demo Scenario Generator")
     print("=" * 60)
 
     # Create tables if needed

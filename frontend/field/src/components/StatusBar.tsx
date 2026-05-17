@@ -13,7 +13,16 @@ export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0
   const [localOnline, setLocalOnline] = useState(navigator.onLine);
   
   const [showSettings, setShowSettings] = useState(false);
-  const [ipValue, setIpValue] = useState(() => localStorage.getItem('triage_server_ip') || 'localhost:8000');
+  const [ipValue, setIpValue] = useState(() => localStorage.getItem('triage_server_ip') || 'https://saha.gokberkceviker.com.tr');
+
+  // Auto-persist default server URL on first mount if not already saved
+  // This ensures immediate connection without requiring Settings → Save
+  useEffect(() => {
+    const existing = localStorage.getItem('triage_server_ip');
+    if (!existing) {
+      localStorage.setItem('triage_server_ip', 'https://saha.gokberkceviker.com.tr');
+    }
+  }, []);
 
   const handleSaveIp = () => {
     localStorage.setItem('triage_server_ip', ipValue);
@@ -73,8 +82,8 @@ export default function StatusBar({ isOnline: isOnlineProp, pendingSyncCount = 0
               type="text" 
               value={ipValue} 
               onChange={(e) => setIpValue(e.target.value)}
-              className="bg-transparent text-white text-xs px-2 outline-none w-32 font-mono"
-              placeholder="192.168.1.1:8000"
+              className="bg-transparent text-white text-xs px-2 outline-none min-w-[220px] font-mono"
+              placeholder="https://api.domain.com"
             />
             <button onClick={handleSaveIp} className="text-xs bg-blue-600 px-2 py-1 rounded font-bold text-white">Kaydet</button>
             <button onClick={() => setShowSettings(false)} className="text-xs px-2 text-white/70 hover:text-white">İptal</button>

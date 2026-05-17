@@ -1,5 +1,5 @@
-TRIAGE V2 - System Architecture Documentation
-markdown# TRIAGE V2 - Offline-First Afet Yönetim Sistemi
+TRIAGE - System Architecture Documentation
+markdown# TRIAGE - Offline-First Afet Yönetim Sistemi
 ## Sistem Mimarisi ve Teknik Dokümantasyon
 
 ---
@@ -31,7 +31,7 @@ markdown# TRIAGE V2 - Offline-First Afet Yönetim Sistemi
 ### 1.1 Vizyon
 **"Depremde internet çöktüğünde bile çalışan sistem."**
 
-TRIAGE V2, afet anında kritik altyapının (internet, GSM) çöktüğü senaryoda bile kesintisiz çalışabilen, asimetrik bir afet yönetim platformudur.
+TRIAGE, afet anında kritik altyapının (internet, GSM) çöktüğü senaryoda bile kesintisiz çalışabilen, asimetrik bir afet yönetim platformudur.
 
 ### 1.2 Temel Çalışma Prensibi
 [Kandilli/AFAD API] → [Master Node AI Processing] → [Local Network Distribution]
@@ -1879,10 +1879,29 @@ triage-v2/
 - [x] Hotfix: Admin UI Real-time Presence Sync
 - [x] Feature: Custom Integrated Draw Toolbar UI
 - [x] Hotfix: SQLite DB Team Seeding & Schema Sync
+- [x] Feature: Dynamic Team Selection UI for Task Dispatch & Visual Feedback
+- [x] Feature: Double-click priority escalation UX for zones and tasks in Override mode
+- [x] Hotfix: Reactive UI sync for new zones via Dexie transaction.on('complete')
+- [x] Hotfix: Resolve fatal React crash on Star (Priority/Override) toolbar icon click
+- [x] Hotfix: Resolve Zone 404 Sync Error (Ghost Polygons) and ID mapping on Priority Override
+- [x] Hotfix: Resolve missing LogType import causing ReferenceError in MapPanel.tsx
+- [x] Hotfix: Resolve GeoJSON Lat/Lng coordinate inversion causing corrupted polygon renders
 - [x] Feature: Native React Draw Control Sub-Panel Under PEN Button
 - [x] Architecture Pivot: Dynamic Device Auto-Registration (No hardcoded teams)
 - [x] Hotfix: Rebind Leaflet L.Draw.Event.CREATED to REST API post
 - [x] Hotfix: Admin UI Data Fetching, Base URL, and CORS strict alignment
+- [x] Feature: Dynamic Team Selection UI for Task Dispatch & Visual Feedback
+- [x] Hotfix: Resolve fatal React crash on Star (Priority/Override) toolbar icon click
+- [x] Feature: True Offline P2P Task Sharing via QR Codes (Generation & Camera Scanning)
+- [x] Feature: Proportional Bulk Task Splitting Algorithm (Math.floor(n/2) by priority)
+- [x] Feature: QR Payload Minification and One-Way Handoff Confirmation Logic
+- [x] Hotfix: Filter out completed/cancelled tasks from P2P QR sharing split logic
+- [x] Hotfix: Resolve global task leak by enforcing targeted WS messaging and strict frontend device ID checks
+- [x] Hotfix: Standardize assigned_team_id to use String device_ids in WS payloads globally — fixes Integer PK vs String device_name mismatch causing field apps to reject their own tasks
+- [x] Hotfix: Eliminate infinite Dexie.js write loops causing QuotaExceededError — deep equality checks, useEffect dep fix, QuotaExceeded auto-purge
+- [x] Hotfix: Restrict QR split calculation to deduplicated unique active-state tasks only — prevents 1-to-5 ghost multiplication
+- [x] Hotfix: Throttle GPS/Team location Dexie persistence to max once per 10s — prevents storage spam from geolocation API
+- [x] Hotfix: Apply defensive deep-equality checks to Zone updates in WS handler — skip identical zone writes
 
 
 ---
@@ -1992,7 +2011,7 @@ Offline fallback ekle
 ```ini
 # /etc/systemd/system/triage-backend.service
 [Unit]
-Description=TRIAGE V2 FastAPI Backend
+Description=TRIAGE FastAPI Backend
 After=network.target
 
 [Service]
@@ -2053,7 +2072,7 @@ server {
 # scripts/deploy.sh
 set -e
 
-echo "=== TRIAGE V2 Bare-Metal Deploy ==="
+echo "=== TRIAGE Bare-Metal Deploy ==="
 
 # Backend
 cd /opt/triage-v2/backend
@@ -2443,7 +2462,7 @@ async def websocket_endpoint(websocket: WebSocket, device_id: str):
 
 ## 19. Sonuç ve Next Steps
 
-Bu doküman, TRIAGE V2 sisteminin tam bir teknik blueprint'ini sunmaktadır. 
+Bu doküman, TRIAGE sisteminin tam bir teknik blueprint'ini sunmaktadır. 
 
 ### İlk Başlangıç Adımları:
 
@@ -2493,6 +2512,36 @@ Bu doküman, TRIAGE V2 sisteminin tam bir teknik blueprint'ini sunmaktadır.
 
 ---
 
-**Doküman Versiyonu:** 1.0  
-**Son Güncelleme:** 2024-01-01  
+## 18. Feature Changelog
+
+### v1.1 — Emergency Override & Advanced Offline Scoring
+
+- [X] **Feature: Emergency Task Queuing** — Command Center can now dispatch tasks to teams with `busy` status. Busy teams appear with orange `[Meşgul - Kuyruğa Ekle]` badge in admin UI. No backend validation blocks manual assignment to busy teams. Team sees queued task as "Next Task".
+
+- [X] **Feature: Advanced Weighted Mathematical Model for Offline Priority Scoring** — Replaced simplistic if/elif bucketed fallback with continuous weighted model: exponential magnitude scaling (`M^1.5 * 10`), depth attenuation (`max(1.0, depth*0.5)`), population density modifier, old building vulnerability factor, and distance decay. Outputs accurate 1.0–5.0 priority score when Gemini API is offline.
+
+- [X] Refinement: Integrate logarithmic seismic attenuation model for offline priority scoring
+
+- [X] Hotfix: Implement /api/v1/debug/ai-status endpoint and fix OpsHeader 404 polling error
+
+- [X] Refinement: Dynamic protocol upgrade (HTTP→WS, HTTPS→WSS) and UI expansion for Field App server config
+
+- [X] Hotfix: Correct Field App QR production domain mapping → `https://saha.gokberkceviker.com.tr`
+
+- [X] Feature: UI Localization for Priority Badges (YÜKSEK, ORTA, DÜŞÜK) via `getPriorityLabel()`
+
+- [X] Feature: Two-column Triage Routing logic (Urgent RED/YELLOW → Left ACİL KUYRUK, Backlog GREEN → Right YEDEK HAVUZ)
+
+- [X] Hotfix: Wire Field App UI buttons to trigger P2P QR Share and Scan modals
+
+- [X] Hotfix: Force dynamic key re-rendering on map polygons to bypass Leaflet pathOptions immutability
+
+- [X] Hotfix: Implement array deduplication and strict UPSERT logic to resolve React key collisions in task lists
+
+- [X] Hotfix: Eradicate Ghost Tasks by removing mock data, fixing ID sync, and enforcing frontend-backend state reconciliation
+
+---
+
+**Doküman Versiyonu:** 1.1  
+**Son Güncelleme:** 2026-05-16  
 **Hazırlayan:** TRIAGE Development Team

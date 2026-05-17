@@ -112,11 +112,11 @@ async def assign_pending_tasks(session: AsyncSession) -> List[Dict[str, Any]]:
         team.status = "busy"
         team.last_seen = datetime.now(timezone.utc)
 
-        # Remove from idle pool
-        idle_teams.remove(team)
+        # NOTE: Do NOT remove team from idle_teams — teams can hold multiple tasks
 
         assignments.append({
             "task_id": task.id,
+            "zone_id": task.zone_id,
             "team_id": team.id,
             "team_device_id": team.device_id,
             "team_name": team.name,
@@ -232,7 +232,8 @@ async def broadcast_assignments(assignments: List[Dict[str, Any]]) -> None:
         for a in assignments:
             task_data = {
                 "id": a["task_id"],
-                "assigned_team_id": a["team_id"],
+                "zone_id": a.get("zone_id"),
+                "assigned_team_id": a["team_device_id"],  # HOTFIX: Use string device_id, not integer PK
                 "status": "assigned",
                 "priority": a["priority"],
                 "address": a.get("address"),

@@ -166,7 +166,7 @@ async def generate_from_analysis(
             damage_levels = _damage_levels_for_score(z_ref["score"])
             offsets = _generate_offsets(z_ref["recommended_teams"])
 
-            for i in range(z_ref["recommended_teams"]):
+            for i in range(min(3, z_ref["recommended_teams"])):
                 lat_off, lng_off = offsets[i] if i < len(offsets) else (0.0, 0.0)
 
                 task = Task(

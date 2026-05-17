@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Online/Offline Status Hook (Admin)
+ * TRIAGE — Online/Offline Status Hook (Admin)
  *
  * Tracks WebSocket connection status via ws_status_change custom events.
  * Defaults to false (offline) until WS connection succeeds.

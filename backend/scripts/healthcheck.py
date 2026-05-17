@@ -1,4 +1,4 @@
-"""TRIAGE V2 — System Health Check
+"""TRIAGE — System Health Check
 
 Verifies:
   1. SQLite database integrity (PRAGMA integrity_check)
@@ -192,7 +192,7 @@ def check_frontend():
 
 def main():
     print('=' * 50)
-    print('  TRIAGE V2 — System Health Check')
+    print('  TRIAGE — System Health Check')
     print('=' * 50)
 
     results = []

@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Online/Offline Status Hook
+ * TRIAGE — Online/Offline Status Hook
  *
  * Listens to WebSocket status events (ws_status_change) for accurate
  * connection state. Falls back to navigator.onLine for initial state.

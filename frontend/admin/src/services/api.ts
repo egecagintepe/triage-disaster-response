@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — REST API Client (Admin)
+ * TRIAGE — REST API Client (Admin)
  *
  * Thin wrapper around fetch() for communicating with the FastAPI backend.
  * Used by the sync queue to push offline changes.
@@ -8,7 +8,13 @@
  * via VITE_API_URL environment variable.
  */
 
-export const API_BASE_URL = "http://localhost:8000";
+const getApiBase = () => {
+  // Always use relative paths so that the browser automatically handles HTTP vs HTTPS,
+  // and routes requests through either the Vite proxy (dev) or Nginx Proxy Manager (prod).
+  return '';
+};
+
+export const API_BASE_URL = getApiBase();
 
 let isRefreshing = false;
 
@@ -78,7 +84,18 @@ export const api = {
     request<T>(path, { method: 'DELETE' }),
 };
 
-/** WebSocket base URL (derived from API URL) */
-export const WS_BASE =
-  import.meta.env.VITE_WS_URL ||
-  API_BASE_URL.replace(/^http/, 'ws');
+/** WebSocket base URL (derived dynamically from current host) */
+export const WS_BASE = (() => {
+  if (typeof window === 'undefined') return 'ws://localhost:8000';
+  const loc = window.location;
+  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+
+  if (loc.hostname !== 'localhost' && loc.hostname !== '127.0.0.1') {
+    if (protocol === 'wss:') {
+      return `wss://${loc.hostname}`;
+    }
+    return `ws://${loc.hostname}:8000`;
+  }
+
+  return import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+})();

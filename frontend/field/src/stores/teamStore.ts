@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Team Store (Field / Saha)
+ * TRIAGE — Team Store (Field / Saha)
  *
  * Zustand store with persist middleware for the field device's own team info.
  * On the field app, "team" primarily refers to this device's own identity,
@@ -66,24 +66,36 @@ export const useTeamStore = create<TeamState>()(
 
       /**
        * Update this device's GPS coordinates.
+       * HOTFIX: Throttle Dexie writes to max once per 10s to prevent QuotaExceededError.
        */
       updateMyLocation: async (lat, lng) => {
         const myTeam = get().myTeam;
         if (!myTeam) return;
 
+        // Always update Zustand (in-memory, instant UI)
         set((state) => ({
           myTeam: state.myTeam
             ? { ...state.myTeam, current_lat: lat, current_lng: lng }
             : null,
         }));
 
+        // Throttle Dexie persist — max once per 10s
+        const now = Date.now();
+        const last = (window as any)._field_loc_persist ?? 0;
+        if (now - last < 10_000) return; // Skip — too soon
+        (window as any)._field_loc_persist = now;
+
         try {
           await db.teams.update(myTeam.id, {
             current_lat: lat,
             current_lng: lng,
           });
-        } catch (e) {
-          console.error('[TeamStore] Dexie location persist failed:', e);
+        } catch (e: any) {
+          if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+            console.error('[TeamStore] QuotaExceeded — skipping location persist');
+          } else {
+            console.error('[TeamStore] Dexie location persist failed:', e);
+          }
         }
       },
     }),

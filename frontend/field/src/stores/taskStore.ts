@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Task Store (Field / Saha)
+ * TRIAGE — Task Store (Field / Saha)
  *
  * Zustand store with persist middleware for task state management.
  * Implements optimistic UI updates: local state is updated immediately,
@@ -20,6 +20,7 @@ interface TaskState {
   setTasks: (tasks: Task[]) => void;
   setActiveTask: (task: Task | null) => void;
   addTask: (task: Task) => void;
+  removeTask: (taskId: number) => void;
   updateTask: (task: Partial<Task> & { id: number }) => void;
 
   completeTask: (taskId: number, status: Task['status']) => Promise<void>;
@@ -37,8 +38,16 @@ export const useTaskStore = create<TaskState>()(
 
       setActiveTask: (task) => set({ activeTask: task }),
 
-      addTask: (task) =>
-        set((state) => ({ tasks: [...state.tasks, task] })),
+      addTask: (newTask) =>
+        set((state) => {
+          const existingIndex = state.tasks.findIndex(t => t.id === newTask.id);
+          if (existingIndex > -1) {
+            const updated = [...state.tasks];
+            updated[existingIndex] = { ...updated[existingIndex], ...newTask };
+            return { tasks: updated };
+          }
+          return { tasks: [...state.tasks, newTask] };
+        }),
 
       updateTask: (updatedTask) =>
         set((state) => ({
@@ -49,6 +58,12 @@ export const useTaskStore = create<TaskState>()(
             state.activeTask?.id === updatedTask.id
               ? { ...state.activeTask, ...updatedTask }
               : state.activeTask,
+        })),
+
+      removeTask: (taskId) =>
+        set((state) => ({
+          tasks: state.tasks.filter((t) => t.id !== taskId),
+          activeTask: state.activeTask?.id === taskId ? null : state.activeTask,
         })),
 
       /**

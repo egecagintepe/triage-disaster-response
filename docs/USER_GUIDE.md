@@ -1,4 +1,4 @@
-# TRIAGE V2 — Kullanım Kılavuzu
+# TRIAGE — Kullanım Kılavuzu
 
 > Afet Yönetim Sistemi — Komuta Merkezi ve Saha Ekipleri için kapsamlı rehber.
 
@@ -16,7 +16,7 @@
 
 ## Genel Bakış
 
-TRIAGE V2, deprem sonrası arama-kurtarma operasyonlarını koordine eden, **internet bağlantısı olmadan çalışabilen** bir afet yönetim sistemidir.
+TRIAGE, deprem sonrası arama-kurtarma operasyonlarını koordine eden, **internet bağlantısı olmadan çalışabilen** bir afet yönetim sistemidir.
 
 ### Sistem Bileşenleri
 
@@ -197,4 +197,4 @@ sudo journalctl -u triage-backend -f --no-pager -n 50
 
 ---
 
-*TRIAGE V2 — İnternet yokken bile hayat kurtarır.*
+*TRIAGE — İnternet yokken bile hayat kurtarır.*

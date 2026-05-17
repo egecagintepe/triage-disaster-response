@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Field Login Page
+ * TRIAGE — Field Login Page
  *
  * Simple placeholder login for field devices.
  * Saves a dummy JWT token to localStorage.
@@ -58,7 +58,7 @@ export default function Login({ onLogin }: LoginProps) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">TRIAGE V2</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">TRIAGE</h1>
           <p className="text-sm text-gray-500 mt-1 font-mono uppercase tracking-widest">Saha Ekibi Girişi</p>
         </div>
 

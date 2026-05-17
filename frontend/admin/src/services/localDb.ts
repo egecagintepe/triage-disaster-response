@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Admin (Komuta Merkezi) Local Database
+ * TRIAGE — Admin (Komuta Merkezi) Local Database
  *
  * Dexie.js wrapper over IndexedDB.  Even the admin dashboard benefits from a
  * local cache so that the UI remains responsive while the server is being
@@ -11,13 +11,13 @@
 import Dexie, { type Table } from 'dexie';
 
 /* ------------------------------------------------------------------ */
-/*  TypeScript interfaces (aligned with backend SQLAlchemy models)     */
+/*  TypeScript interfaces (aligned with backend SQLAlchemy models)    */
 /* ------------------------------------------------------------------ */
 
 export interface Task {
   id: number;
   zone_id: number;
-  assigned_team_id: number | null;
+  assigned_team_id: number | string | null;
   status: 'pending_approval' | 'pending' | 'assigned' | 'in_progress' | 'needs_backup' | 'false_alarm' | 'resolved';
   priority: 'RED' | 'YELLOW' | 'GREEN';
   lat: number;
@@ -43,6 +43,8 @@ export interface Team {
   last_seen?: string;
   current_lat?: number;
   current_lng?: number;
+  battery_level?: number;
+  ping_ms?: number;
   is_online?: boolean;
   created_at?: string;
 }
@@ -78,7 +80,7 @@ export interface Setting {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Database class                                                     */
+/*  Database class                                                    */
 /* ------------------------------------------------------------------ */
 
 class TriageAdminDB extends Dexie {
@@ -104,7 +106,7 @@ class TriageAdminDB extends Dexie {
 export const db = new TriageAdminDB();
 
 /* ------------------------------------------------------------------ */
-/*  Sync queue helpers                                                 */
+/*  Sync queue helpers                                                */
 /* ------------------------------------------------------------------ */
 
 /**

@@ -3,7 +3,7 @@ chcp 65001 >nul 2>&1
 setlocal EnableDelayedExpansion
 
 echo ==================================================
-echo   TRIAGE V2 — Windows Auto-Start Script
+echo   TRIAGE — Windows Auto-Start Script
 echo ==================================================
 echo.
 

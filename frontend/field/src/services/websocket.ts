@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — WebSocket Client (Field)
+ * TRIAGE — WebSocket Client (Field)
  *
  * Native WebSocket client with automatic reconnection.
  * When the server pushes task/team updates, this service:
@@ -12,21 +12,16 @@
  * Reference: architecture.md Section 8.2
  */
 
+import ReconnectingWebSocket from 'reconnecting-websocket';
 import { db } from './localDb';
 import { getWsBase } from './api';
 import { syncQueue } from './syncQueue';
 import { useTaskStore } from '../stores/taskStore';
 import { useTeamStore } from '../stores/teamStore';
 
-const RECONNECT_DELAY_MS = 1_000;
-const MAX_RECONNECT_DELAY_MS = 5_000;
-const MAX_RECONNECT_ATTEMPTS = 50;
-
 class WebSocketManager {
-  private socket: WebSocket | null = null;
+  private socket: ReconnectingWebSocket | null = null;
   private deviceId: string = '';
-  private reconnectAttempts = 0;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalClose = false;
 
   /* ---------------------------------------------------------------- */
@@ -41,7 +36,6 @@ class WebSocketManager {
 
   disconnect(): void {
     this.intentionalClose = true;
-    this.clearReconnectTimer();
     if (this.socket) {
       this.socket.close();
       this.socket = null;
@@ -75,6 +69,20 @@ class WebSocketManager {
     });
   }
 
+  /**
+   * Send full telemetry (battery + location) to server.
+   */
+  sendTelemetry(lat: number, lng: number, battery: number): void {
+    this.send({
+      type: 'TELEMETRY_UPDATE',
+      device_id: this.deviceId,
+      lat,
+      lng,
+      battery,
+      timestamp: Date.now(),
+    });
+  }
+
   /* ---------------------------------------------------------------- */
   /*  Full sync on reconnection                                        */
   /* ---------------------------------------------------------------- */
@@ -102,40 +110,40 @@ class WebSocketManager {
     console.log(`[WS] Connecting to ${url}…`);
 
     try {
-      this.socket = new WebSocket(url);
+      this.socket = new ReconnectingWebSocket(url, [], {
+        maxReconnectionDelay: 5000,
+        minReconnectionDelay: 1000,
+        reconnectionDelayGrowFactor: 1.5,
+        maxRetries: 50,
+      });
     } catch (err) {
       console.error('[WS] Failed to create socket:', err);
-      this.scheduleReconnect();
       return;
     }
 
-    this.socket.onopen = () => {
+    this.socket.addEventListener('open', () => {
       console.log('[WS] Connected');
-      this.reconnectAttempts = 0;
       window.dispatchEvent(new CustomEvent('ws_status_change', { detail: true }));
       this.performFullSync();
-    };
+    });
 
-    this.socket.onclose = (ev) => {
+    this.socket.addEventListener('close', (ev) => {
       console.log(`[WS] Closed (code=${ev.code})`);
       window.dispatchEvent(new CustomEvent('ws_status_change', { detail: false }));
-      if (!this.intentionalClose) {
-        this.scheduleReconnect();
-      }
-    };
+    });
 
-    this.socket.onerror = (ev) => {
+    this.socket.addEventListener('error', (ev) => {
       console.error('[WS] Error:', ev);
-    };
+    });
 
-    this.socket.onmessage = (ev) => {
+    this.socket.addEventListener('message', (ev) => {
       try {
         const msg = JSON.parse(ev.data);
         this.handleMessage(msg);
       } catch (err) {
         console.error('[WS] Failed to parse message:', err);
       }
-    };
+    });
   }
 
   /* ---------------------------------------------------------------- */
@@ -224,13 +232,72 @@ class WebSocketManager {
     });
   }
 
+  /**
+   * Extract target device ID from assigned_team_id safely.
+   * Backend may send string device_id, integer PK, or populated object.
+   */
+  private extractTargetId(raw: unknown): string | null {
+    if (!raw) return null;
+    if (typeof raw === 'object' && raw !== null) {
+      return (raw as any).device_id || (raw as any).device_name || String((raw as any).id ?? '');
+    }
+    return String(raw);
+  }
+
   private async handleTaskUpdate(data: Record<string, unknown>): Promise<void> {
     if (!data || !data.id) return;
-    try {
-      await db.tasks.update(data.id as number, data as any);
+
+    // HOTFIX: Defensive filter — only process tasks assigned to this device
+    const myDeviceId = localStorage.getItem('device_name');
+    const targetId = this.extractTargetId(data.assigned_team_id);
+    if (targetId && targetId !== myDeviceId) {
+      // Check if we already have this task locally (it was previously ours)
+      const existing = useTaskStore.getState().tasks.find(t => t.id === data.id);
+      if (!existing) {
+        console.warn(`[WS] Received TASK_UPDATE for team ${targetId}, not mine (${myDeviceId}). Ignoring.`);
+        return;
+      }
+      // If we had it and it's now reassigned away, remove it locally
+      await db.tasks.delete(data.id as number);
+      useTaskStore.getState().removeTask(data.id as number);
+      console.log(`[WS] Task #${data.id} reassigned away from me. Removed locally.`);
+      return;
+    }
+
+    const existing = useTaskStore.getState().tasks.find(t => t.id === data.id);
+    if (existing) {
+      // HOTFIX: Deep equality check — skip write if nothing changed
+      if (
+        existing.status === data.status &&
+        existing.priority === data.priority &&
+        existing.assigned_team_id === data.assigned_team_id &&
+        existing.notes === data.notes
+      ) {
+        return; // Identical — skip Dexie write to prevent storage spam
+      }
+      try {
+        await db.tasks.update(data.id as number, data as any);
+      } catch (e: any) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+          console.error('[STORAGE] QuotaExceeded on task update — purging stale cache');
+          await db.tasks.clear();
+          await db.syncQueue.clear();
+        }
+        return;
+      }
       useTaskStore.getState().updateTask(data as any);
-    } catch {
-      await db.tasks.put(data as any);
+    } else {
+      // New task arriving via broadcast — add it
+      try {
+        await db.tasks.put(data as any);
+      } catch (e: any) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+          console.error('[STORAGE] QuotaExceeded on task put — purging stale cache');
+          await db.tasks.clear();
+          await db.syncQueue.clear();
+        }
+        return;
+      }
       useTaskStore.getState().addTask(data as any);
     }
   }
@@ -240,8 +307,48 @@ class WebSocketManager {
     msg: Record<string, unknown>,
   ): Promise<void> {
     if (!data || !data.id) return;
-    await db.tasks.put(data as any);
-    useTaskStore.getState().addTask(data as any);
+
+    // HOTFIX: Defensive filter — only accept tasks assigned to this device
+    const myDeviceId = localStorage.getItem('device_name');
+    const targetId = this.extractTargetId(data.assigned_team_id);
+    if (targetId && targetId !== myDeviceId) {
+      console.warn(`[WS] Received NEW_TASK for team ${targetId}, not mine (${myDeviceId}). Ignoring.`);
+      return;
+    }
+
+    // HOTFIX: Skip if we already have this exact task
+    const existingTask = useTaskStore.getState().tasks.find(t => t.id === data.id);
+    if (existingTask) {
+      // Already have it — treat as update only if changed
+      if (
+        existingTask.status === data.status &&
+        existingTask.priority === data.priority &&
+        existingTask.assigned_team_id === data.assigned_team_id
+      ) {
+        return; // Identical — skip to prevent storage spam
+      }
+      try {
+        await db.tasks.update(data.id as number, data as any);
+      } catch (e: any) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+          await db.tasks.clear();
+          await db.syncQueue.clear();
+        }
+        return;
+      }
+      useTaskStore.getState().updateTask(data as any);
+    } else {
+      try {
+        await db.tasks.put(data as any);
+      } catch (e: any) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('QuotaExceeded')) {
+          await db.tasks.clear();
+          await db.syncQueue.clear();
+        }
+        return;
+      }
+      useTaskStore.getState().addTask(data as any);
+    }
 
     // Browser notification
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -291,34 +398,8 @@ class WebSocketManager {
   }
 
   /* ---------------------------------------------------------------- */
-  /*  Reconnection (exponential backoff)                               */
+  /*  Reconnection                                                     */
   /* ---------------------------------------------------------------- */
-
-  private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.error('[WS] Max reconnect attempts reached');
-      return;
-    }
-
-    const delay = Math.min(
-      RECONNECT_DELAY_MS * Math.pow(1.5, this.reconnectAttempts),
-      MAX_RECONNECT_DELAY_MS,
-    );
-
-    console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts + 1})`);
-    this.clearReconnectTimer();
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectAttempts++;
-      this.openSocket();
-    }, delay);
-  }
-
-  private clearReconnectTimer(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-  }
 }
 
 export const wsManager = new WebSocketManager();

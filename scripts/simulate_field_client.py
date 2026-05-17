@@ -1,5 +1,5 @@
 """
-Simulation script for E2E testing of the TRIAGE V2 WebSocket & Sync Bridge.
+Simulation script for E2E testing of the TRIAGE WebSocket & Sync Bridge.
 This script acts as a simulated field client, connecting to the FastAPI backend,
 performing a handshake, and waiting for an incoming task assignment.
 

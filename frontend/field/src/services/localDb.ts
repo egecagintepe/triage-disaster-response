@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Field (Saha) Application Local Database
+ * TRIAGE — Field (Saha) Application Local Database
  *
  * Dexie.js wrapper over IndexedDB — the core of the offline-first architecture.
  * All user actions write here FIRST, then queue for server sync.
@@ -16,7 +16,7 @@ import Dexie, { type Table } from 'dexie';
 export interface Task {
   id: number;
   zone_id: number;
-  assigned_team_id: number | null;
+  assigned_team_id: number | string | null;
   status: 'pending_approval' | 'pending' | 'assigned' | 'in_progress' | 'needs_backup' | 'false_alarm' | 'resolved';
   priority: 'RED' | 'YELLOW' | 'GREEN';
   lat: number;
@@ -42,6 +42,9 @@ export interface Team {
   last_seen?: string;
   current_lat?: number;
   current_lng?: number;
+  battery_level?: number;
+  ping_ms?: number;
+  is_online?: boolean;
   created_at?: string;
 }
 

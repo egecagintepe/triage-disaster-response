@@ -7,8 +7,10 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import StatusBar from './components/StatusBar';
 import TaskMap from './components/TaskMap';
 import SwipeButton from './components/SwipeButton';
+import QrShareModal from './components/QrShareModal';
+import QrScannerModal from './components/QrScannerModal';
 import Login from './pages/Login';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Sprint 2.1 + 2.3 services
 import { useTaskStore } from './stores/taskStore';
@@ -33,11 +35,16 @@ export default function App() {
   const isOnline = useOnlineStatus();
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [emergencyAlert, setEmergencyAlert] = useState<{ message: string; severity: string } | null>(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [isQrShareOpen, setIsQrShareOpen] = useState(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
-  // Active task = first pending/assigned/in_progress task for this device
-  const activeTask: Task | undefined = tasks.find(
+  // Active tasks = all pending/assigned/in_progress tasks for this device
+  const activeTasks: Task[] = tasks.filter(
     (t) => t.status === 'pending' || t.status === 'assigned' || t.status === 'in_progress',
   );
+  const [activeTaskIndex, setActiveTaskIndex] = useState(0);
+  const activeTask: Task | undefined = activeTasks[activeTaskIndex] ?? activeTasks[0];
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -57,11 +64,24 @@ export default function App() {
     wsManager.connect(deviceName);
 
     // Load tasks from Dexie into Zustand (initial hydration)
-    db.tasks.toArray().then((dbTasks) => {
-      if (dbTasks.length > 0) {
-        useTaskStore.getState().setTasks(dbTasks);
+    const hydrateFromDexie = async () => {
+      try {
+        const dbTasks = await db.tasks.toArray();
+        if (dbTasks.length > 0) {
+          // Deduplicate before setting
+          const unique = Array.from(new Map(dbTasks.map(t => [t.id, t])).values());
+          useTaskStore.getState().setTasks(unique);
+        }
+      } catch (error: any) {
+        if (error?.name === 'QuotaExceededError' || error?.message?.includes('QuotaExceeded')) {
+          console.error('[STORAGE] QuotaExceeded — purging stale task cache');
+          await db.tasks.clear();
+          await db.syncQueue.clear();
+          useTaskStore.getState().setTasks([]);
+        }
       }
-    });
+    };
+    hydrateFromDexie();
 
     return () => {
       syncQueue.stopAutoSync();
@@ -74,21 +94,23 @@ export default function App() {
     if (!isAuthenticated) return;
 
     let watchId: number | undefined;
+    let latestLocation: { lat: number; lng: number } | null = null;
 
     if ('geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          latestLocation = loc;
           setUserLocation(loc);
         },
         (err) => console.error('[Geo] Konum hatası:', err),
         { enableHighAccuracy: true },
       );
 
-      // Send location to server every 10s
+      // Send location to server every 10s (uses closure, not state)
       locationIntervalRef.current = setInterval(() => {
-        if (userLocation && wsManager.isConnected) {
-          wsManager.sendLocation(userLocation.lat, userLocation.lng);
+        if (latestLocation && wsManager.isConnected) {
+          wsManager.sendLocation(latestLocation.lat, latestLocation.lng);
         }
       }, 10_000);
     }
@@ -97,7 +119,8 @@ export default function App() {
       if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
       if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
     };
-  }, [isAuthenticated, userLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   // --- Poll pending sync count ---
   useEffect(() => {
@@ -216,6 +239,28 @@ export default function App() {
       <main className="flex-1 flex flex-col">
         {activeTask ? (
           <>
+            {/* Multi-task navigation */}
+            {activeTasks.length > 1 && (
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+                <button
+                  onClick={() => setActiveTaskIndex(Math.max(0, activeTaskIndex - 1))}
+                  disabled={activeTaskIndex === 0}
+                  className="px-3 py-1 text-sm font-bold rounded bg-zinc-800 text-white disabled:opacity-30"
+                >
+                  ◀ Önceki
+                </button>
+                <span className="text-xs font-mono text-gray-400">
+                  Görev {activeTaskIndex + 1} / {activeTasks.length}
+                </span>
+                <button
+                  onClick={() => setActiveTaskIndex(Math.min(activeTasks.length - 1, activeTaskIndex + 1))}
+                  disabled={activeTaskIndex >= activeTasks.length - 1}
+                  className="px-3 py-1 text-sm font-bold rounded bg-zinc-800 text-white disabled:opacity-30"
+                >
+                  Sonraki ▶
+                </button>
+              </div>
+            )}
             <TaskMap
               taskLat={activeTask.lat}
               taskLng={activeTask.lng}
@@ -224,52 +269,63 @@ export default function App() {
               address={activeTask.address || `Konum: ${activeTask.lat.toFixed(4)}, ${activeTask.lng.toFixed(4)}`}
               priority={activeTask.priority}
               status={activeTask.status}
+              isExpanded={isMapExpanded}
+              onExpand={() => setIsMapExpanded(true)}
+              onCollapse={() => setIsMapExpanded(false)}
             />
 
-            <div className="flex-1 px-4 flex flex-col justify-center gap-6 py-6 overflow-hidden">
-              {/* Show different buttons based on task status */}
-              {(activeTask.status === 'pending' || activeTask.status === 'assigned') && (
-                <>
-                  <SwipeButton
-                    label="Bölgeye Ulaşıldı →"
-                    thumbColor="bg-emerald-600"
-                    onConfirm={handleArrived}
-                  />
-                  <SwipeButton
-                    label="Destek Ekip Lazım →"
-                    thumbColor="bg-red-600"
-                    pulse
-                    onConfirm={handleRequestBackup}
-                  />
-                  <SwipeButton
-                    label="Hasar Yok / İptal →"
-                    thumbColor="bg-gray-600"
-                    onConfirm={handleCancel}
-                  />
-                </>
-              )}
+            <AnimatePresence>
+              {!isMapExpanded && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 50, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex-1 px-4 flex flex-col justify-center gap-6 py-6 overflow-hidden"
+                >
+                  {/* Show different buttons based on task status */}
+                  {(activeTask.status === 'pending' || activeTask.status === 'assigned') && (
+                    <>
+                      <SwipeButton
+                        label="Bölgeye Ulaşıldı →"
+                        thumbColor="bg-emerald-600"
+                        onConfirm={handleArrived}
+                      />
+                      <SwipeButton
+                        label="Görev Paylaştır →"
+                        thumbColor="bg-amber-500"
+                        onConfirm={() => setIsQrShareOpen(true)}
+                      />
+                      <SwipeButton
+                        label="Hasar Yok / İptal →"
+                        thumbColor="bg-gray-600"
+                        onConfirm={handleCancel}
+                      />
+                    </>
+                  )}
 
-              {activeTask.status === 'in_progress' && (
-                <>
-                  <SwipeButton
-                    label="Görev Tamamlandı →"
-                    thumbColor="bg-emerald-600"
-                    onConfirm={handleComplete}
-                  />
-                  <SwipeButton
-                    label="Destek Ekip Lazım →"
-                    thumbColor="bg-red-600"
-                    pulse
-                    onConfirm={handleRequestBackup}
-                  />
-                  <SwipeButton
-                    label="Yanlış Alarm →"
-                    thumbColor="bg-gray-600"
-                    onConfirm={handleCancel}
-                  />
-                </>
+                  {activeTask.status === 'in_progress' && (
+                    <>
+                      <SwipeButton
+                        label="Görev Tamamlandı →"
+                        thumbColor="bg-emerald-600"
+                        onConfirm={handleComplete}
+                      />
+                      <SwipeButton
+                        label="Görev Paylaştır →"
+                        thumbColor="bg-amber-500"
+                        onConfirm={() => setIsQrShareOpen(true)}
+                      />
+                      <SwipeButton
+                        label="Yanlış Alarm →"
+                        thumbColor="bg-gray-600"
+                        onConfirm={handleCancel}
+                      />
+                    </>
+                  )}
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -296,10 +352,30 @@ export default function App() {
                   {pendingSyncCount} işlem senkronize edilmeyi bekliyor
                 </div>
               )}
+
+              <button
+                onClick={() => setIsQrScannerOpen(true)}
+                className="mt-4 w-full py-3 bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 text-cyan-300 font-bold rounded-xl transition-colors text-sm"
+              >
+                📥 QR ile Görev Al
+              </button>
             </motion.div>
           </div>
         )}
       </main>
+
+      {/* QR Modals */}
+      {isQrShareOpen && (
+        <QrShareModal 
+          onClose={() => setIsQrShareOpen(false)} 
+          tasks={activeTasks}
+        />
+      )}
+      {isQrScannerOpen && (
+        <QrScannerModal 
+          onClose={() => setIsQrScannerOpen(false)} 
+        />
+      )}
     </div>
   );
 }

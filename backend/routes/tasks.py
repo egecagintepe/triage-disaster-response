@@ -58,6 +58,51 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
     return task
 
 
+@router.post("/approve-all", status_code=200)
+async def approve_all_tasks(db: AsyncSession = Depends(get_db)):
+    """Phase 3: Bulk Approval Endpoint"""
+    from sqlalchemy import update
+    stmt = update(Task).where(Task.status == 'pending_approval').values(
+        status='pending',
+        updated_at=datetime.now(timezone.utc)
+    ).returning(Task)
+    
+    result = await db.execute(stmt)
+    updated_tasks = result.scalars().all()
+    await db.commit()
+    
+    # NOTE: Auto-dispatch removed. Admin must explicitly trigger OTO-ATA.
+    # assignments = await assign_pending_tasks(db)
+    # if assignments:
+    #     await broadcast_assignments(assignments)
+        
+    try:
+        from main import ws_manager
+        # Tell frontend to reload tasks or broadcast each updated task
+        for task in updated_tasks:
+            # Resolve device_id for field app matching
+            device_id = None
+            if task.assigned_team_id:
+                from models.team import Team
+                team_r = await db.execute(select(Team).where(Team.id == task.assigned_team_id))
+                team_obj = team_r.scalar_one_or_none()
+                device_id = team_obj.device_id if team_obj else None
+
+            await ws_manager.broadcast_task_update({
+                "id": task.id,
+                "status": task.status,
+                "assigned_team_id": device_id or task.assigned_team_id,
+                "priority": task.priority,
+                "address": task.address,
+                "lat": task.lat,
+                "lng": task.lng,
+            })
+    except Exception as e:
+        print(f"[WS] Error broadcasting bulk update: {e}")
+
+    return {"status": "ok", "approved_count": len(updated_tasks)}
+
+
 @router.post("", response_model=TaskResponse, status_code=201)
 async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
     """Create a new task."""
@@ -66,10 +111,10 @@ async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(task)
 
-    # Auto-assign if there are idle teams
-    assignments = await assign_pending_tasks(db)
-    if assignments:
-        await broadcast_assignments(assignments)
+    # NOTE: Auto-dispatch removed. Admin must explicitly trigger OTO-ATA.
+    # assignments = await assign_pending_tasks(db)
+    # if assignments:
+    #     await broadcast_assignments(assignments)
 
     return task
 
@@ -128,15 +173,34 @@ async def update_task(task_id: int, payload: TaskUpdate, db: AsyncSession = Depe
     # Broadcast task update to all devices
     try:
         from main import ws_manager
-        await ws_manager.broadcast_task_update({
+        # HOTFIX: Resolve integer team.id → string device_id for field app matching
+        assigned_device_id = None
+        if task.assigned_team_id:
+            from models.team import Team
+            team_result2 = await db.execute(select(Team).where(Team.id == task.assigned_team_id))
+            assigned_team_obj = team_result2.scalar_one_or_none()
+            assigned_device_id = assigned_team_obj.device_id if assigned_team_obj else None
+
+        task_data_dict = {
             "id": task.id,
+            "zone_id": task.zone_id,
             "status": task.status,
-            "assigned_team_id": task.assigned_team_id,
+            "assigned_team_id": assigned_device_id or task.assigned_team_id,
             "priority": task.priority,
             "address": task.address,
             "lat": task.lat,
             "lng": task.lng,
-        })
+            "building_type": task.building_type,
+            "notes": task.notes,
+        }
+        await ws_manager.broadcast_task_update(task_data_dict)
+        
+        if new_status == "assigned" and task.assigned_team_id:
+            from models.team import Team
+            team_result = await db.execute(select(Team).where(Team.id == task.assigned_team_id))
+            assigned_team = team_result.scalar_one_or_none()
+            if assigned_team:
+                await ws_manager.send_task_assignment(assigned_team.device_id, task_data_dict)
     except Exception:
         pass
 

@@ -1,5 +1,5 @@
 /**
- * TRIAGE V2 — Sync Queue (Field)
+ * TRIAGE — Sync Queue (Field)
  *
  * Implements the "Outbox Pattern": all write operations are first saved
  * to a local Dexie `syncQueue` table, then pushed to the backend when
@@ -11,7 +11,7 @@
 import { db } from './localDb';
 import { api } from './api';
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 const AUTO_SYNC_INTERVAL_MS = 30_000; // 30 seconds
 
 class SyncQueue {

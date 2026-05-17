@@ -44,6 +44,8 @@ class TeamResponse(BaseModel):
     last_seen: Optional[datetime] = None
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
+    battery_level: Optional[int] = 100
+    ping_ms: Optional[int] = 0
     is_online: Optional[bool] = False
     created_at: Optional[datetime] = None
 

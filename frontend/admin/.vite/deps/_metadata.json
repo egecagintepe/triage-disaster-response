@@ -1,0 +1,97 @@
+{
+  "hash": "8404ef82",
+  "configHash": "3bbfb502",
+  "lockfileHash": "eaba343b",
+  "browserHash": "2dfbf543",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "134aead4",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "84ae1637",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "4ccaf48d",
+      "needsInterop": true
+    },
+    "zustand": {
+      "src": "../../node_modules/zustand/esm/index.mjs",
+      "file": "zustand.js",
+      "fileHash": "fb59adc4",
+      "needsInterop": false
+    },
+    "zustand/middleware": {
+      "src": "../../node_modules/zustand/esm/middleware.mjs",
+      "file": "zustand_middleware.js",
+      "fileHash": "7d0eb09f",
+      "needsInterop": false
+    },
+    "motion/react": {
+      "src": "../../node_modules/motion/dist/es/react.mjs",
+      "file": "motion_react.js",
+      "fileHash": "3f061b56",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "d6e6fada",
+      "needsInterop": false
+    },
+    "dexie": {
+      "src": "../../node_modules/dexie/import-wrapper.mjs",
+      "file": "dexie.js",
+      "fileHash": "59040064",
+      "needsInterop": false
+    },
+    "qrcode.react": {
+      "src": "../../node_modules/qrcode.react/lib/esm/index.js",
+      "file": "qrcode__react.js",
+      "fileHash": "a73aa3cb",
+      "needsInterop": false
+    },
+    "react-leaflet": {
+      "src": "../../node_modules/react-leaflet/lib/index.js",
+      "file": "react-leaflet.js",
+      "fileHash": "330ec336",
+      "needsInterop": false
+    },
+    "react-leaflet-draw": {
+      "src": "../../node_modules/react-leaflet-draw/dist/esm/index.js",
+      "file": "react-leaflet-draw.js",
+      "fileHash": "a57ea1b6",
+      "needsInterop": false
+    },
+    "leaflet": {
+      "src": "../../node_modules/leaflet/dist/leaflet-src.js",
+      "file": "leaflet.js",
+      "fileHash": "872c3c27",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-VCQPVP55": {
+      "file": "chunk-VCQPVP55.js"
+    },
+    "chunk-CHPFRV3U": {
+      "file": "chunk-CHPFRV3U.js"
+    },
+    "chunk-JCVW5MJG": {
+      "file": "chunk-JCVW5MJG.js"
+    },
+    "chunk-HUS7GAVC": {
+      "file": "chunk-HUS7GAVC.js"
+    },
+    "chunk-PR4QN5HX": {
+      "file": "chunk-PR4QN5HX.js"
+    }
+  }
+}

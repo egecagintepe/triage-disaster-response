@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { motion, useMotionValue, useTransform, useSpring } from 'motion/react';
+import { motion, useMotionValue, useTransform, animate } from 'motion/react';
 import { ChevronRight } from 'lucide-react';
 
 interface SwipeButtonProps {
@@ -29,12 +29,12 @@ export default function SwipeButton({ label, onConfirm, thumbColor, pulse }: Swi
         onConfirm();
         // Reset after a delay
         setTimeout(() => {
-          x.set(0);
+          animate(x, 0, { type: 'spring', stiffness: 300, damping: 25 });
           setIsSuccess(false);
         }, 1000);
       } else {
         // Snap back
-        x.set(0);
+        animate(x, 0, { type: 'spring', stiffness: 400, damping: 25 });
       }
     }
   };

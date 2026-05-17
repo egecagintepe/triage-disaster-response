@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# TRIAGE V2 — Bare-Metal Deployment Script
+# TRIAGE — Bare-Metal Deployment Script
 # ============================================================================
 # Target: Linux Master Node (Raspberry Pi / Mini-PC / Any Debian/Ubuntu)
 #
@@ -36,7 +36,7 @@ NODE_BIN="node"
 NPM_BIN="npm"
 
 echo "=============================================="
-echo "  TRIAGE V2 — Bare-Metal Deployment"
+echo "  TRIAGE — Bare-Metal Deployment"
 echo "=============================================="
 echo "Project: $PROJECT_DIR"
 echo "User:    $SERVICE_USER"
@@ -117,7 +117,7 @@ echo "[4/6] Creating systemd service..."
 
 cat > /etc/systemd/system/triage-backend.service << SVCEOF
 [Unit]
-Description=TRIAGE V2 FastAPI Backend
+Description=TRIAGE FastAPI Backend
 After=network.target
 Wants=network-online.target
 
@@ -147,7 +147,7 @@ echo ""
 echo "[5/6] Configuring Nginx..."
 
 cat > /etc/nginx/sites-available/triage << NGXEOF
-# TRIAGE V2 — Admin Dashboard (port $ADMIN_PORT)
+# TRIAGE — Admin Dashboard (port $ADMIN_PORT)
 server {
     listen $ADMIN_PORT;
     server_name _;
@@ -189,7 +189,7 @@ server {
     gzip_types text/css application/javascript application/json;
 }
 
-# TRIAGE V2 — Field App (port $FIELD_PORT)
+# TRIAGE — Field App (port $FIELD_PORT)
 server {
     listen $FIELD_PORT;
     server_name _;
@@ -251,7 +251,7 @@ systemctl restart nginx
 
 echo ""
 echo "=============================================="
-echo "  ✅ TRIAGE V2 Deployment Complete!"
+echo "  ✅ TRIAGE Deployment Complete!"
 echo "=============================================="
 echo ""
 echo "  Backend API:    http://0.0.0.0:$BACKEND_PORT"
