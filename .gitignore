@@ -1,0 +1,38 @@
+# Environments
+.env
+.env.*
+!.env.example
+
+# Python cache & virtualenvs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.ipynb_checkpoints
+
+# Node / JS / build output
+node_modules/
+dist/
+dev-dist/
+build/
+.vite/
+.eslintcache
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Databases & data folder contents
+*.sqlite
+*.db
+data/triage.db
+backend/data/
+data/*.geojson
+backend/data/*.geojson
+*.geojson

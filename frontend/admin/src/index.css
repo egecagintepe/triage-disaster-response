@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* OLED Command Center Palette — Cyber-Baroque */
+  --color-bg-base: #000000;
+  --color-bg-elevated: #09090b;
+  --color-bg-panel: #0a0a0c;
+  --color-surface: #0a0a0c;
+  --color-border-default: #1c1c1e;
+  --color-border-subtle: #ffffff0d;
+  --color-success: #10B981;
+  --color-error: #EF4444;
+  --color-warning: #F59E0B;
+  --color-info: #3B82F6;
+  --color-accent-gold: #D4A843;
+  --color-accent-crimson: #DC2626;
+  --color-critical: #ef4444;
+  --color-active: #10b981;
+  --color-cyber: #3b82f6;
+  --color-dark: #000000;
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-zinc-950/90 backdrop-blur-2xl border border-white/[0.06] shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-xl;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-black text-gray-100 font-sans tracking-tight overflow-hidden antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom hatching for No-Go Zones */
+.no-go-pattern {
+  fill: url(#no-go-hatch);
+}
+
+/* Radar ping for fleet units */
+@keyframes radar-ping {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* Phase 7: Pulsing Critical Zones — breathing glow on map SVG paths */
+@keyframes pulse-glow {
+  0%, 100% { stroke-opacity: 1; fill-opacity: 0.35; }
+  50% { stroke-opacity: 0.4; fill-opacity: 0.15; }
+}
+
+.leaflet-interactive.zone-critical {
+  animation: pulse-glow 2s ease-in-out infinite !important;
+}
+
+.leaflet-interactive.zone-high {
+  animation: pulse-glow 3s ease-in-out infinite !important;
+}
+
+/* Custom scrollbar for terminal/logs */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c1c1e;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #27272a;
+}
+
+/* Map marker styles — OLED black base */
+.leaflet-container {
+  background: #000000 !important;
+}
+
+/* Glowing marker dot */
+.triage-marker-dot {
+  position: relative;
+  border-radius: 50%;
+}
+
+.triage-marker-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  background: inherit;
+  border-radius: inherit;
+  animation: marker-pulse 1.5s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+@keyframes marker-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* Nuke ALL Leaflet Draw controls — absolute kill */
+.leaflet-draw,
+.leaflet-draw-toolbar,
+.leaflet-draw-section,
+.leaflet-draw-actions,
+[class*='leaflet-draw'],
+.leaflet-control-savetiles,
+[class*='savetiles'] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Kill default leaflet marker blue square icon fallback */
+.leaflet-default-icon-path {
+  display: none !important;
+}
+
+/* Sonner toast overrides for Cyber-Baroque */
+[data-sonner-toaster] {
+  font-family: "JetBrains Mono", monospace !important;
+}
+
+/* Leaflet tooltip — kill default white border/background for dark-themed tooltips */
+.leaflet-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.leaflet-tooltip-top::before,
+.leaflet-tooltip-bottom::before,
+.leaflet-tooltip-left::before,
+.leaflet-tooltip-right::before {
+  border-color: transparent !important;
+}

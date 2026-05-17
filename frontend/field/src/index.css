@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  @keyframes pulse {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.2); opacity: 0.3; }
+    100% { transform: scale(0.95); opacity: 0.8; }
+  }
+}
+
+@layer base {
+  html, body, #root {
+    @apply h-full w-full overflow-hidden overscroll-none bg-black text-white;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-zinc-800 rounded-full;
+}
+
+/* Leaflet Dark Mode — OLED */
+.leaflet-container {
+  background: #000000 !important;
+}
+
+
+
+.leaflet-control-zoom {
+  border: none !important;
+}
+
+.leaflet-bar a {
+  @apply bg-zinc-900! text-white! border-zinc-800!;
+}
+
+.leaflet-control-attribution {
+  @apply bg-black/70! text-zinc-500! text-[10px]!;
+}

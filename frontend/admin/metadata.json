@@ -1,0 +1,6 @@
+{
+  "name": "Kriz Masası Veri Merkezi",
+  "description": "Gerçek zamanlı saha operasyonları, sistem sağlığı ve yapay zeka tarafından belirlenen risk bölgelerini izleyen kriz yönetimi komuta merkezi arayüzü.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
